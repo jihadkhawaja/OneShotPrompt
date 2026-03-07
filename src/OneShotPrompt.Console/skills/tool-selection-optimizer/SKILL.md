@@ -20,6 +20,8 @@ Heuristics:
 - Prefer zero tools when the answer can be produced from the prompt, memory, or loaded skills alone.
 - Prefer read-only tools before mutation or destructive tools.
 - If two tools overlap, choose the narrower or safer tool first.
+- Prefer dedicated filesystem tools over command execution when simple file inspection or file mutation is enough.
+- Prefer `RunDotNetCommand` over `RunCommand` for .NET and C# work.
 - Keep the active shortlist to at most 3 tools at a time unless the task clearly requires more.
 - Do not compare many similar tools by trial and error.
 

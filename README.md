@@ -21,7 +21,7 @@ flowchart LR
 	Skills["Bundled + custom skills"] --> Console
 	Console --> Selector["Tool-selection pass"]
 	Selector --> Agent["Execution agent"]
-	Agent --> Tools["Filesystem tools"]
+	Agent --> Tools["Filesystem + process tools"]
 	Agent --> Memory["Per-job memory"]
 	Agent --> Providers["OpenAI / Anthropic / Compatible APIs"]
 ```
@@ -53,14 +53,14 @@ If you run the app with no arguments, it defaults to `run --config config.yaml`.
 
 - `src/OneShotPrompt.Core`: domain models and configuration types.
 - `src/OneShotPrompt.Application`: use cases and orchestration.
-- `src/OneShotPrompt.Infrastructure`: YAML loading, provider integration, low-level file tools, and memory persistence.
+- `src/OneShotPrompt.Infrastructure`: YAML loading, provider integration, low-level built-in tools, and memory persistence.
 - `src/OneShotPrompt.Console`: CLI entrypoint with Native AOT enabled and bundled Agent Skills.
 
 ## Notes
 
 - `ThinkingLevel` accepts `low`, `medium`, or `high`.
 - `AutoApprove: false` exposes read-only tools only.
-- `AutoApprove: true` enables file-changing tools.
+- `AutoApprove: true` enables file-changing tools and process execution tools.
 - `AllowedTools` can further restrict the tool catalog before selection.
 - Custom skills can be placed in a `skills/` directory next to the active config file.
 - Job memory is stored in `.oneshotprompt/memory/` next to the active config file.

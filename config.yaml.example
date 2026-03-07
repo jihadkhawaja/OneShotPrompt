@@ -27,3 +27,12 @@ Jobs:
     ThinkingLevel: "low"
     Schedule: "Daily at midnight"
     Enabled: true
+
+  - Name: "repo-build-check"
+    Prompt: "Build the repository next to this config file with dotnet and summarize any failures."
+    Provider: "OpenAI"
+    AutoApprove: true
+    AllowedTools: "RunDotNetCommand, ReadTextFile, ListDirectory"
+    PersistMemory: false
+    ThinkingLevel: "medium"
+    Enabled: false

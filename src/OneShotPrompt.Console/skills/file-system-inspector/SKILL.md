@@ -11,11 +11,13 @@ Use this skill whenever a job needs to understand local files or directories.
 Workflow:
 1. Resolve well-known folders before guessing absolute paths.
 2. List the relevant directory before reading or changing anything inside it.
-3. Read only the text files needed to decide on the next step.
-4. Summarize the current state briefly before proposing or applying changes.
+3. For large files, inspect text length first and then read only the needed line ranges.
+4. Read only the text files or line ranges needed to decide on the next step.
+5. Summarize the current state briefly before proposing or applying changes.
 
 Guidelines:
 - Prefer the least invasive inspection that answers the task.
 - If a path does not exist, report that clearly instead of inventing alternatives.
 - For binary or unsupported files, report the limitation instead of pretending to inspect them.
+- Prefer `GetTextFileLength` and `ReadTextFileLines` over a full read when the file may be large.
 - Never claim a filesystem change occurred from inspection alone.

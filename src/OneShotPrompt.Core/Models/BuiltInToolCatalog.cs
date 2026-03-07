@@ -7,11 +7,15 @@ public static class BuiltInToolCatalog
         new("GetKnownFolder", false),
         new("ListDirectory", false),
         new("ReadTextFile", false),
+        new("ReadTextFileLines", false),
+        new("GetTextFileLength", false),
         new("CreateDirectory", true),
         new("MoveFile", true),
         new("CopyFile", true),
         new("DeleteFile", true),
         new("WriteTextFile", true),
+        new("RunCommand", true),
+        new("RunDotNetCommand", true),
     ];
 
     public static bool IsKnown(string toolName)

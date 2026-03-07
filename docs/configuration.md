@@ -48,16 +48,22 @@ Each entry under `Jobs:` supports the following properties:
 
 ## Tool Access Model
 
-`AutoApprove` controls whether a job can mutate the filesystem.
+`AutoApprove` controls whether a job can mutate the local environment.
 
 - `false`: the agent can inspect files and directories only.
-- `true`: the agent can also create directories, move files, copy files, delete files, and write files.
+- `true`: the agent can also create directories, move files, copy files, delete files, write files, and run built-in process execution tools.
 
 `AllowedTools` is an additional restriction layer. When present, it filters the registered tool catalog before the selector agent runs.
 
 - Use a comma-separated list such as `GetKnownFolder, ListDirectory, ReadTextFile`.
 - Unknown tool names are rejected during config validation.
 - Mutation tools in `AllowedTools` require `AutoApprove: true`.
+
+Current built-in tools:
+
+- Inspection: `GetKnownFolder`, `ListDirectory`, `ReadTextFile`, `ReadTextFileLines`, `GetTextFileLength`
+- File mutation: `CreateDirectory`, `MoveFile`, `CopyFile`, `DeleteFile`, `WriteTextFile`
+- Process execution: `RunCommand`, `RunDotNetCommand`
 
 This is the main safety boundary in the current design. Use `false` for planning or audit-style jobs and `true` only for deterministic automation you trust.
 
@@ -68,7 +74,7 @@ OneShotPrompt automatically exposes Agent Skills from two locations:
 - Bundled skills shipped with the console app.
 - A `skills/` directory next to the active config file.
 
-Skills package instructions and references for the agent. They do not replace concrete file I/O in the current runtime, so local reads and writes still happen through the built-in tools.
+Skills package instructions and references for the agent. They do not replace concrete file I/O or process execution in the current runtime, so local actions still happen through the built-in tools.
 
 Bundled skills include a tool-selection optimizer. Before the main execution agent is created, OneShotPrompt runs a selector pass that uses this skill to choose the smallest relevant tool subset for the job. The execution agent then runs with only that selected subset, which keeps jobs more deterministic when many tools are registered.
 

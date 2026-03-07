@@ -56,6 +56,61 @@ public sealed class FileSystemTools
         return text.Length <= 8_000 ? text : text[..8_000] + "...";
     }
 
+    [Description("Reads a UTF-8 text file from startLine to endLine, inclusive. Line numbers are 1-based. Use this for large files when only a specific range is needed.")]
+    public string ReadTextFileLines(string path, int startLine, int endLine)
+    {
+        if (!File.Exists(path))
+        {
+            return $"File does not exist: {path}";
+        }
+
+        if (startLine < 1 || endLine < startLine)
+        {
+            return "Invalid line range. startLine must be >= 1 and endLine must be >= startLine.";
+        }
+
+        var lines = File.ReadAllLines(path, Encoding.UTF8);
+
+        if (lines.Length == 0)
+        {
+            return $"File is empty: {path}";
+        }
+
+        if (startLine > lines.Length)
+        {
+            return $"Requested startLine {startLine} is beyond the end of the file. Total lines: {lines.Length}.";
+        }
+
+        var clampedEndLine = Math.Min(endLine, lines.Length);
+        var builder = new StringBuilder();
+        builder.AppendLine($"File: {path}");
+        builder.AppendLine($"Lines: {startLine}-{clampedEndLine} of {lines.Length}");
+
+        for (var lineNumber = startLine; lineNumber <= clampedEndLine; lineNumber++)
+        {
+            builder.AppendLine($"{lineNumber}: {lines[lineNumber - 1]}");
+        }
+
+        return builder.ToString().TrimEnd();
+    }
+
+    [Description("Returns UTF-8 text size details for a file, including character, line, and byte counts. Use this before chunked reads of large files.")]
+    public string GetTextFileLength(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return $"File does not exist: {path}";
+        }
+
+        var text = File.ReadAllText(path, Encoding.UTF8);
+        var lineCount = text.Length == 0
+            ? 0
+            : text.Split(["\r\n", "\n"], StringSplitOptions.None).Length;
+        var byteCount = Encoding.UTF8.GetByteCount(text);
+
+        return $"File: {path}{Environment.NewLine}Characters: {text.Length}{Environment.NewLine}Lines: {lineCount}{Environment.NewLine}UTF-8 bytes: {byteCount}";
+    }
+
     [Description("Creates a directory if it does not exist.")]
     public string CreateDirectory(string path)
     {

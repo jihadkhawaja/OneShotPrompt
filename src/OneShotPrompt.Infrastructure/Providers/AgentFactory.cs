@@ -23,7 +23,7 @@ public sealed class AgentFactory : IJobAgentFactory
             throw new InvalidOperationException($"Unsupported provider '{job.Provider}'.");
         }
 
-        var availableTools = BuildToolDefinitions(job);
+        var availableTools = BuildToolDefinitions(job, configDirectory);
         var eligibleTools = ApplyAllowlist(job, availableTools);
         var chatClient = CreateChatClient(config, provider);
         var selection = await SelectToolsAsync(chatClient, config, job, configDirectory, eligibleTools, cancellationToken);
@@ -173,6 +173,7 @@ public sealed class AgentFactory : IJobAgentFactory
             "Use concrete tools only for actions that skills cannot perform directly.",
             "Do not call tools speculatively or 'just in case'.",
             "Keep tool use minimal and expand the plan through reasoning before acting.",
+            "RunCommand and RunDotNetCommand execute a process directly without shell syntax, so do not rely on pipes, redirection, shell built-ins, or &&.",
             "Never claim that a file-system change happened unless a tool call actually succeeded.",
             job.AutoApprove
                 ? "Mutation tools are available only if they survived the selector pass. Keep changes minimal and deterministic."
@@ -258,14 +259,17 @@ public sealed class AgentFactory : IJobAgentFactory
             .ToList();
     }
 
-    private static IReadOnlyList<ToolDefinition> BuildToolDefinitions(JobDefinition job)
+    private static IReadOnlyList<ToolDefinition> BuildToolDefinitions(JobDefinition job, string configDirectory)
     {
         var fileSystemTools = new FileSystemTools();
+        var processTools = new ProcessTools(configDirectory);
         var tools = new List<ToolDefinition>
         {
             new("GetKnownFolder", "Resolve a well-known path such as home, desktop, documents, downloads, or temp.", false, () => AIFunctionFactory.Create(fileSystemTools.GetKnownFolder)),
             new("ListDirectory", "Inspect a directory before reading, moving, or deleting items inside it.", false, () => AIFunctionFactory.Create(fileSystemTools.ListDirectory)),
             new("ReadTextFile", "Read a UTF-8 text file when the task depends on file contents.", false, () => AIFunctionFactory.Create(fileSystemTools.ReadTextFile)),
+            new("ReadTextFileLines", "Read a specific inclusive line range from a UTF-8 text file when the file is too large for a full read.", false, () => AIFunctionFactory.Create(fileSystemTools.ReadTextFileLines)),
+            new("GetTextFileLength", "Inspect a text file's character, line, and UTF-8 byte counts before planning chunked reads.", false, () => AIFunctionFactory.Create(fileSystemTools.GetTextFileLength)),
         };
 
         if (job.AutoApprove)
@@ -275,6 +279,8 @@ public sealed class AgentFactory : IJobAgentFactory
             tools.Add(new("CopyFile", "Copy a file to a new location.", true, () => AIFunctionFactory.Create(fileSystemTools.CopyFile)));
             tools.Add(new("DeleteFile", "Delete a file when removal is explicitly required.", true, () => AIFunctionFactory.Create(fileSystemTools.DeleteFile)));
             tools.Add(new("WriteTextFile", "Create or overwrite a UTF-8 text file when the task requires writing content.", true, () => AIFunctionFactory.Create(fileSystemTools.WriteTextFile)));
+            tools.Add(new("RunCommand", "Run an installed executable directly without a shell when the task needs scriptable or tool-driven automation.", true, () => AIFunctionFactory.Create(processTools.RunCommand)));
+            tools.Add(new("RunDotNetCommand", "Run a dotnet CLI command for .NET and C# automation without a shell.", true, () => AIFunctionFactory.Create(processTools.RunDotNetCommand)));
         }
 
         return tools;
