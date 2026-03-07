@@ -1,0 +1,44 @@
+name: PR Build and Test
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-build-test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore OneShotPrompt.slnx
+
+      - name: Build
+        run: dotnet build OneShotPrompt.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test tests/OneShotPrompt.Tests/OneShotPrompt.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: tests/OneShotPrompt.Tests/TestResults/**/*.trx
+          if-no-files-found: ignore
