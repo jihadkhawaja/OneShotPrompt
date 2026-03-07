@@ -239,6 +239,12 @@ _pkginfo.txt
 *.appxbundle
 *.appxupload
 
+# OneShotPrompt runtime files
+.oneshotprompt/
+config.yaml
+config.local.yaml
+.tmp.config.yaml
+
 # Visual Studio cache files
 # files ending in .cache can be ignored
 *.[Cc]ache
@@ -416,3 +422,5 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+.vscode/

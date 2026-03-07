@@ -1,0 +1,78 @@
+using OneShotPrompt.Core.Enums;
+
+namespace OneShotPrompt.Core.Models;
+
+public sealed class AppConfig
+{
+    public OpenAIProviderSettings OpenAI { get; } = new();
+
+    public AnthropicProviderSettings Anthropic { get; } = new();
+
+    public OpenAICompatibleProviderSettings OpenAICompatible { get; } = new();
+
+    public string ThinkingLevel { get; set; } = "low";
+
+    public bool PersistMemory { get; set; } = true;
+
+    public List<JobDefinition> Jobs { get; } = [];
+}
+
+public sealed class OpenAIProviderSettings
+{
+    public string ApiKey { get; set; } = string.Empty;
+
+    public string Model { get; set; } = "gpt-5-nano";
+}
+
+public sealed class AnthropicProviderSettings
+{
+    public string ApiKey { get; set; } = string.Empty;
+
+    public string Model { get; set; } = "claude-haiku-4-5";
+}
+
+public sealed class OpenAICompatibleProviderSettings
+{
+    public string Endpoint { get; set; } = "http://localhost:1234/v1";
+
+    public string ApiKey { get; set; } = "lm-studio";
+
+    public string Model { get; set; } = "default";
+}
+
+public sealed class JobDefinition
+{
+    public string Name { get; set; } = string.Empty;
+
+    public string Prompt { get; set; } = string.Empty;
+
+    public string Provider { get; set; } = nameof(JobProvider.OpenAI);
+
+    public bool AutoApprove { get; set; }
+
+    public bool? PersistMemory { get; set; }
+
+    public string? ThinkingLevel { get; set; }
+
+    public string? Schedule { get; set; }
+
+    public bool Enabled { get; set; } = true;
+
+    public bool ResolvePersistMemory(AppConfig config) => PersistMemory ?? config.PersistMemory;
+
+    public string ResolveThinkingLevel(AppConfig config) => ThinkingLevel ?? config.ThinkingLevel;
+}
+
+public sealed class JobMemoryDocument
+{
+    public List<JobMemoryEntry> Entries { get; set; } = [];
+}
+
+public sealed class JobMemoryEntry
+{
+    public DateTimeOffset TimestampUtc { get; set; }
+
+    public string Prompt { get; set; } = string.Empty;
+
+    public string Response { get; set; } = string.Empty;
+}

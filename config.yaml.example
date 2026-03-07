@@ -1,0 +1,26 @@
+OpenAI:
+  ApiKey: ""
+  Model: "gpt-5-nano"
+
+Anthropic:
+  ApiKey: ""
+  Model: "claude-haiku-4-5"
+
+OpenAICompatible:
+  Endpoint: "http://localhost:1234/v1"
+  ApiKey: "lm-studio"
+  Model: "default"
+
+ThinkingLevel: "low"
+
+PersistMemory: true
+
+Jobs:
+  - Name: "downloads-cleanup"
+    Prompt: "Organize files in Downloads by type"
+    Provider: "OpenAI"
+    AutoApprove: true
+    PersistMemory: false
+    ThinkingLevel: "low"
+    Schedule: "Daily at midnight"
+    Enabled: true

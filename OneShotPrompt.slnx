@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OneShotPrompt.Application/OneShotPrompt.Application.csproj" />
+    <Project Path="src/OneShotPrompt.Console/OneShotPrompt.Console.csproj" />
+    <Project Path="src/OneShotPrompt.Core/OneShotPrompt.Core.csproj" />
+    <Project Path="src/OneShotPrompt.Infrastructure/OneShotPrompt.Infrastructure.csproj" />
+  </Folder>
+</Solution>
