@@ -3,7 +3,7 @@ using System.Text;
 
 namespace OneShotPrompt.Infrastructure.Tools;
 
-public sealed class FileSystemToolbox
+public sealed class FileSystemTools
 {
     [Description("Returns a useful system path. Supported names: home, desktop, documents, downloads, temp.")]
     public string GetKnownFolder(string name)

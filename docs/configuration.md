@@ -54,6 +54,15 @@ Each entry under `Jobs:` supports the following properties:
 
 This is the main safety boundary in the current design. Use `false` for planning or audit-style jobs and `true` only for deterministic automation you trust.
 
+## Agent Skills
+
+OneShotPrompt automatically exposes Agent Skills from two locations:
+
+- Bundled skills shipped with the console app.
+- A `skills/` directory next to the active config file.
+
+Skills package instructions and references for the agent. They do not replace concrete file I/O in the current runtime, so local reads and writes still happen through the built-in tools.
+
 ## Validation Rules
 
 The application rejects a config when any of these are true:

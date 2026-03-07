@@ -4,5 +4,5 @@ namespace OneShotPrompt.Application.Abstractions;
 
 public interface IJobAgentFactory
 {
-    Task<IJobAgent> CreateAsync(AppConfig config, JobDefinition job, CancellationToken cancellationToken);
+    Task<IJobAgent> CreateAsync(AppConfig config, JobDefinition job, string configDirectory, CancellationToken cancellationToken);
 }

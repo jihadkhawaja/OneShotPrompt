@@ -8,7 +8,8 @@ It uses Microsoft Agent Framework for agent execution, supports OpenAI, Anthropi
 
 - Loads jobs from `config.yaml`.
 - Runs all enabled jobs or a single named job.
-- Uses local filesystem tools so jobs can inspect and change files.
+- Loads bundled and user-provided Agent Skills.
+- Uses low-level filesystem tools when a skill needs concrete local file I/O.
 - Persists per-job execution memory in `.oneshotprompt/memory/` when enabled.
 - Leaves scheduling to the operating system, which keeps the app simple and predictable.
 
@@ -16,8 +17,8 @@ It uses Microsoft Agent Framework for agent execution, supports OpenAI, Anthropi
 
 - `src/OneShotPrompt.Core`: domain models and configuration types.
 - `src/OneShotPrompt.Application`: use cases and orchestration.
-- `src/OneShotPrompt.Infrastructure`: YAML loading, provider integration, filesystem tools, and memory persistence.
-- `src/OneShotPrompt.Console`: CLI entrypoint with Native AOT enabled.
+- `src/OneShotPrompt.Infrastructure`: YAML loading, provider integration, low-level file tools, and memory persistence.
+- `src/OneShotPrompt.Console`: CLI entrypoint with Native AOT enabled and bundled Agent Skills.
 
 ## Docs And Scripts
 
@@ -71,6 +72,15 @@ Jobs:
 - `Schedule` is metadata for humans and deployment scripts. The app does not run its own scheduler.
 - `AutoApprove: true` enables file-changing tools like move, copy, delete, create directory, and write file.
 - `AutoApprove: false` exposes read-only tools only, so the agent can inspect and propose a plan without mutating files.
+- The agent always advertises bundled filesystem skills and also loads any skills found under a `skills/` directory next to the active config file.
+
+## Agent Skills
+
+OneShotPrompt wires Agent Skills through `FileAgentSkillsProvider`.
+
+- Bundled skills are copied with the console app under `skills/` at build and publish time.
+- Custom skills can be added by creating a `skills/` directory next to your active config file.
+- Skills provide reusable instructions and resources. Concrete filesystem reads and writes still happen through tools, because current Agent Framework skill support does not execute scripts.
 
 ## Commands
 

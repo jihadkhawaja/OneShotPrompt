@@ -40,7 +40,7 @@ public sealed class JobRunner(
 
             try
             {
-                var agent = await agentFactory.CreateAsync(config, job, cancellationToken);
+                var agent = await agentFactory.CreateAsync(config, job, configDirectory, cancellationToken);
                 var response = await agent.RunAsync(prompt, cancellationToken);
 
                 await output.WriteLineAsync(response.Trim());
