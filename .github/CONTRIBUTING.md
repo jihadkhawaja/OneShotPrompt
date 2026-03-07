@@ -12,6 +12,9 @@
 1. Install the .NET SDK version pinned in `global.json`.
 2. Clone the repository.
 3. Restore and build the solution.
+4. Use the shared package versions from `Directory.Packages.props` for any new
+  NuGet dependencies.
+5. Follow the repo-wide formatting and style guidance in `.editorconfig`.
 
 ```powershell
 dotnet restore OneShotPrompt.slnx
@@ -28,6 +31,14 @@ dotnet test tests/OneShotPrompt.Tests/OneShotPrompt.Tests.csproj
 
 If you change CLI behavior, configuration handling, scheduling docs, or bundled
 skills, update the related documentation in `README.md` or `docs/`.
+
+## Dependency Management
+
+- This repository uses NuGet Central Package Management.
+- Add new package versions in `Directory.Packages.props` instead of individual
+  project files.
+- Keep `PackageReference` items in project files versionless unless a
+  project-specific override is intentionally required.
 
 ## Configuration and Safety
 

@@ -70,3 +70,8 @@ If you run the app with no arguments, it defaults to `run --config config.yaml`.
 ```powershell
 dotnet build OneShotPrompt.slnx
 ```
+
+## Development Conventions
+
+- NuGet package versions are managed centrally in `Directory.Packages.props`.
+- Repo-wide C# formatting and code style preferences live in `.editorconfig`.
