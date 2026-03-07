@@ -9,146 +9,61 @@ It uses Microsoft Agent Framework for agent execution, supports OpenAI, Anthropi
 - Loads jobs from `config.yaml`.
 - Runs all enabled jobs or a single named job.
 - Loads bundled and user-provided Agent Skills.
-- Uses low-level filesystem tools when a skill needs concrete local file I/O.
-- Runs an automatic preflight tool-selection pass so the execution agent is created only with the tools needed for the task.
-- Persists per-job execution memory in `.oneshotprompt/memory/` when enabled.
-- Leaves scheduling to the operating system, which keeps the app simple and predictable.
+- Runs an automatic tool-selection pass before execution.
+- Persists per-job memory in `.oneshotprompt/memory/` when enabled.
+- Leaves scheduling to the operating system.
 
-## Solution Layout
+## How It Fits Together
+
+```mermaid
+flowchart LR
+	Config["config.yaml"] --> Console["OneShotPrompt.Console"]
+	Skills["Bundled + custom skills"] --> Console
+	Console --> Selector["Tool-selection pass"]
+	Selector --> Agent["Execution agent"]
+	Agent --> Tools["Filesystem tools"]
+	Agent --> Memory["Per-job memory"]
+	Agent --> Providers["OpenAI / Anthropic / Compatible APIs"]
+```
+
+## Quick Start
+
+1. Copy `config.yaml.example` to `config.yaml`.
+2. Fill in the provider settings you need and add at least one job.
+3. Validate the config.
+4. List jobs or run one.
+
+```powershell
+dotnet run --project src/OneShotPrompt.Console -- validate --config config.yaml
+dotnet run --project src/OneShotPrompt.Console -- jobs --config config.yaml
+dotnet run --project src/OneShotPrompt.Console -- run --config config.yaml
+dotnet run --project src/OneShotPrompt.Console -- run --config config.yaml --job downloads-cleanup
+```
+
+If you run the app with no arguments, it defaults to `run --config config.yaml`.
+
+## Docs
+
+- [Configuration guide](docs/configuration.md)
+- [Operations guide](docs/operations.md)
+- [Windows Task Scheduler walkthrough](docs/windows-task-scheduler.md)
+- [Linux scheduling walkthrough](docs/linux-scheduling.md)
+
+## Project Layout
 
 - `src/OneShotPrompt.Core`: domain models and configuration types.
 - `src/OneShotPrompt.Application`: use cases and orchestration.
 - `src/OneShotPrompt.Infrastructure`: YAML loading, provider integration, low-level file tools, and memory persistence.
 - `src/OneShotPrompt.Console`: CLI entrypoint with Native AOT enabled and bundled Agent Skills.
 
-## Docs And Scripts
-
-- `docs/configuration.md`: supported config fields, validation rules, and safety notes.
-- `docs/operations.md`: validate, list, run, publish, and inspect runtime artifacts.
-- `docs/windows-task-scheduler.md`: Windows scheduling workflow for the published executable.
-- `docs/linux-scheduling.md`: Linux scheduling with `cron` or `systemd` timers.
-- `scripts/validate-config.ps1`: validate a config file.
-- `scripts/list-jobs.ps1`: print configured jobs.
-- `scripts/run-job.ps1`: run all enabled jobs or one named job.
-- `scripts/publish-aot.ps1`: publish a Native AOT build.
-- `scripts/register-daily-task.ps1`: register a daily Windows scheduled task for a published binary.
-
-## Configuration
-
-Start from `config.yaml.example` and create your own `config.yaml`.
-
-```yaml
-OpenAI:
-	ApiKey: ""
-	Model: "gpt-5-nano"
-
-Anthropic:
-	ApiKey: ""
-	Model: "claude-haiku-4-5"
-
-OpenAICompatible:
-	Endpoint: "http://localhost:1234/v1"
-	ApiKey: "lm-studio"
-	Model: "default"
-
-ThinkingLevel: "low"
-
-PersistMemory: true
-
-Jobs:
-	- Name: "downloads-cleanup"
-		Prompt: "Organize files in Downloads by type"
-		Provider: "OpenAI"
-		AutoApprove: true
-		PersistMemory: false
-		ThinkingLevel: "low"
-		Schedule: "Daily at midnight"
-		Enabled: true
-```
-
-### Notes
+## Notes
 
 - `ThinkingLevel` accepts `low`, `medium`, or `high`.
-- Job-level `ThinkingLevel` and `PersistMemory` override the global values.
-- `Schedule` is metadata for humans and deployment scripts. The app does not run its own scheduler.
-- `AutoApprove: true` enables file-changing tools like move, copy, delete, create directory, and write file.
-- `AutoApprove: false` exposes read-only tools only, so the agent can inspect and propose a plan without mutating files.
-- `AllowedTools` can further restrict a job to a comma-separated subset of tool names before the selector pass runs.
-- The agent always advertises bundled filesystem skills and also loads any skills found under a `skills/` directory next to the active config file.
-- Bundled skills include a tool-selection optimizer used by an automatic preflight selector before the main agent run.
-
-## Agent Skills
-
-OneShotPrompt wires Agent Skills through `FileAgentSkillsProvider`.
-
-- Bundled skills are copied with the console app under `skills/` at build and publish time.
-- Custom skills can be added by creating a `skills/` directory next to your active config file.
-- Skills provide reusable instructions and resources. Concrete filesystem reads and writes still happen through tools, because current Agent Framework skill support does not execute scripts.
-- The bundled `tool-selection-optimizer` skill is loaded by a selector agent first, and the next execution agent call receives only the selected tools.
-- If `AllowedTools` is configured, the selector can only choose from that allowlisted subset.
-
-## Commands
-
-```powershell
-dotnet run --project src/OneShotPrompt.Console -- run --config config.yaml
-dotnet run --project src/OneShotPrompt.Console -- run --config config.yaml --job downloads-cleanup
-dotnet run --project src/OneShotPrompt.Console -- validate --config config.yaml
-dotnet run --project src/OneShotPrompt.Console -- jobs --config config.yaml
-```
-
-If you run the app with no arguments, it defaults to `run --config config.yaml`.
-
-## Scheduling
-
-Scheduling is intentionally delegated to the OS.
-
-### Windows Task Scheduler
-
-Use the published executable as the action target.
-
-Program:
-
-```text
-OneShotPrompt.Console.exe
-```
-
-Arguments:
-
-```text
-run --config C:\path\to\config.yaml --job downloads-cleanup
-```
-
-### Linux cron
-
-```cron
-0 0 * * * /opt/oneshotprompt/OneShotPrompt.Console run --config /etc/oneshotprompt/config.yaml --job downloads-cleanup
-```
-
-## Native AOT
-
-Native AOT is enabled in `src/OneShotPrompt.Console/OneShotPrompt.Console.csproj`.
-
-Publish for Windows ARM64:
-
-```powershell
-dotnet publish src/OneShotPrompt.Console/OneShotPrompt.Console.csproj -c Release -r win-arm64
-```
-
-The published binary is emitted under:
-
-```text
-src/OneShotPrompt.Console/bin/Release/net10.0/win-arm64/publish/
-```
-
-### Current AOT Status
-
-- OpenAI and OpenAI-compatible flows publish successfully.
-- Anthropic currently publishes with upstream trim/AOT warnings from the `Anthropic` dependency. The native publish still succeeds, but this remains the main runtime risk area.
-
-## Runtime Artifacts
-
+- `AutoApprove: false` exposes read-only tools only.
+- `AutoApprove: true` enables file-changing tools.
+- `AllowedTools` can further restrict the tool catalog before selection.
+- Custom skills can be placed in a `skills/` directory next to the active config file.
 - Job memory is stored in `.oneshotprompt/memory/` next to the active config file.
-- This folder is ignored by Git.
 
 ## Build
 
