@@ -1,0 +1,114 @@
+name: Publish Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: Release tag/version to publish, for example 1.0
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-release-${{ inputs.release_version }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish ${{ matrix.rid }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: windows-11-arm
+            rid: win-arm64
+          - os: ubuntu-24.04
+            rid: linux-x64
+          - os: ubuntu-24.04-arm
+            rid: linux-arm64
+          - os: macos-13
+            rid: osx-x64
+          - os: macos-14
+            rid: osx-arm64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install Linux AOT dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang zlib1g-dev
+
+      - name: Publish Native AOT binary
+        run: >-
+          dotnet publish src/OneShotPrompt.Console/OneShotPrompt.Console.csproj
+          -c Release
+          -r ${{ matrix.rid }}
+          --self-contained true
+
+      - name: Package publish output
+        shell: pwsh
+        run: |
+          $version = '${{ inputs.release_version }}'
+          $rid = '${{ matrix.rid }}'
+          $publishDir = Join-Path $PWD "src/OneShotPrompt.Console/bin/Release/net10.0/$rid/publish"
+          $artifactDir = Join-Path $PWD artifacts
+          $assetRoot = Join-Path $artifactDir "OneShotPrompt-$version-$rid"
+          $assetZip = Join-Path $artifactDir "OneShotPrompt-$version-$rid.zip"
+
+          if (Test-Path $assetRoot) {
+            Remove-Item $assetRoot -Recurse -Force
+          }
+
+          if (Test-Path $assetZip) {
+            Remove-Item $assetZip -Force
+          }
+
+          New-Item -ItemType Directory -Path $assetRoot -Force | Out-Null
+          Copy-Item -Path (Join-Path $publishDir '*') -Destination $assetRoot -Recurse -Force
+          Compress-Archive -Path $assetRoot -DestinationPath $assetZip
+
+      - name: Upload packaged binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.rid }}
+          path: artifacts/OneShotPrompt-${{ inputs.release_version }}-${{ matrix.rid }}.zip
+          if-no-files-found: error
+
+  release:
+    name: Create release
+    runs-on: ubuntu-24.04
+    needs: publish
+
+    steps:
+      - name: Download packaged binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          pattern: release-*
+          merge-multiple: true
+
+      - name: Create or update GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_version }}
+          name: OneShotPrompt ${{ inputs.release_version }}
+          target_commitish: ${{ github.sha }}
+          generate_release_notes: true
+          make_latest: true
+          overwrite_files: true
+          files: |
+            release-assets/*.zip

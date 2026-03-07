@@ -110,6 +110,23 @@ The default publish output path is:
 src/OneShotPrompt.Console/bin/Release/net10.0/<rid>/publish/
 ```
 
+Supported runtime identifiers in the helper script are:
+
+```text
+win-x64
+win-arm64
+linux-x64
+linux-arm64
+osx-x64
+osx-arm64
+```
+
+## GitHub Releases
+
+The repository includes a manual GitHub Actions workflow named `Publish Release`.
+
+Run it from the Actions tab and provide `release_version` as the exact tag you want to publish. Example: entering `1.0` creates or updates a release tagged `1.0`, marks it as the latest release, and attaches zipped Native AOT publish outputs for each supported platform.
+
 ## Windows Scheduling
 
 For unattended Windows runs, publish first and then register a scheduled task against the produced executable.
