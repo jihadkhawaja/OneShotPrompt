@@ -1,8 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using Microsoft.Agents.AI;
 using OneShotPrompt.Application.Abstractions;
 
 namespace OneShotPrompt.Infrastructure.Providers;
 
+[ExcludeFromCodeCoverage]
 internal sealed class AgentFrameworkJobAgent(AIAgent agent) : IJobAgent
 {
     public async Task<string> RunAsync(string prompt, CancellationToken cancellationToken)

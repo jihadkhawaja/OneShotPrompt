@@ -5,4 +5,7 @@
     <Project Path="src/OneShotPrompt.Core/OneShotPrompt.Core.csproj" />
     <Project Path="src/OneShotPrompt.Infrastructure/OneShotPrompt.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OneShotPrompt.Tests/OneShotPrompt.Tests.csproj" />
+  </Folder>
 </Solution>
