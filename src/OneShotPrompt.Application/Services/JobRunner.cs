@@ -40,8 +40,10 @@ public sealed class JobRunner(
 
             try
             {
-                var agent = await agentFactory.CreateAsync(config, job, configDirectory, cancellationToken);
-                var response = await agent.RunAsync(prompt, cancellationToken);
+                var preparedAgent = await agentFactory.CreateAsync(config, job, configDirectory, cancellationToken);
+                await WriteToolSelectionSummaryAsync(output, preparedAgent.ToolSelection);
+
+                var response = await preparedAgent.Agent.RunAsync(prompt, cancellationToken);
 
                 await output.WriteLineAsync(response.Trim());
                 await output.WriteLineAsync(string.Empty);
@@ -113,6 +115,7 @@ public sealed class JobRunner(
         builder.AppendLine($"Provider: {job.Provider}");
         builder.AppendLine($"Requested reasoning level: {NormalizeThinkingLevel(job.ResolveThinkingLevel(config))}");
         builder.AppendLine($"Mutation tools available: {(job.AutoApprove ? "yes" : "no")}");
+        builder.AppendLine("Tool usage policy: shortlist the minimum relevant tools first, then use only that shortlist unless blocked.");
 
         if (!string.IsNullOrWhiteSpace(job.Schedule))
         {
@@ -144,6 +147,27 @@ public sealed class JobRunner(
         return Enum.TryParse<ThinkingLevel>(value, ignoreCase: true, out var level)
             ? level.ToString().ToLowerInvariant()
             : "low";
+    }
+
+    private static async Task WriteToolSelectionSummaryAsync(TextWriter output, ToolSelectionSummary summary)
+    {
+        await output.WriteLineAsync($"  Tools available before allowlist: {summary.TotalAvailableTools}");
+        await output.WriteLineAsync($"  Tools eligible for selection: {summary.EligibleTools}");
+
+        if (summary.AllowedTools.Count > 0)
+        {
+            await output.WriteLineAsync($"  Tool allowlist: {string.Join(", ", summary.AllowedTools)}");
+        }
+
+        await output.WriteLineAsync($"  Selector used: {(summary.SelectorUsed ? "yes" : "no")}");
+        await output.WriteLineAsync($"  Selected tools: {(summary.SelectedTools.Count == 0 ? "none" : string.Join(", ", summary.SelectedTools))}");
+
+        if (!string.IsNullOrWhiteSpace(summary.Rationale))
+        {
+            await output.WriteLineAsync($"  Selection rationale: {summary.Rationale}");
+        }
+
+        await output.WriteLineAsync(string.Empty);
     }
 
     private static string Truncate(string value, int maxLength)

@@ -59,7 +59,16 @@ PowerShell helper:
 
 ## What The App Prints
 
-During a run, the console prints the selected job name, the model response, and any per-job failure message.
+During a run, the console prints the selected job name, selector telemetry, the model response, and any per-job failure message.
+
+Selector telemetry includes:
+
+- Total tools available before any allowlist is applied.
+- Tools eligible after allowlist filtering.
+- The configured allowlist, when present.
+- Whether the selector pass actually ran.
+- The final selected tool names.
+- Any selector rationale returned by the model.
 
 Validation prints the job count when the file is valid.
 

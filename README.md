@@ -10,6 +10,7 @@ It uses Microsoft Agent Framework for agent execution, supports OpenAI, Anthropi
 - Runs all enabled jobs or a single named job.
 - Loads bundled and user-provided Agent Skills.
 - Uses low-level filesystem tools when a skill needs concrete local file I/O.
+- Runs an automatic preflight tool-selection pass so the execution agent is created only with the tools needed for the task.
 - Persists per-job execution memory in `.oneshotprompt/memory/` when enabled.
 - Leaves scheduling to the operating system, which keeps the app simple and predictable.
 
@@ -72,7 +73,9 @@ Jobs:
 - `Schedule` is metadata for humans and deployment scripts. The app does not run its own scheduler.
 - `AutoApprove: true` enables file-changing tools like move, copy, delete, create directory, and write file.
 - `AutoApprove: false` exposes read-only tools only, so the agent can inspect and propose a plan without mutating files.
+- `AllowedTools` can further restrict a job to a comma-separated subset of tool names before the selector pass runs.
 - The agent always advertises bundled filesystem skills and also loads any skills found under a `skills/` directory next to the active config file.
+- Bundled skills include a tool-selection optimizer used by an automatic preflight selector before the main agent run.
 
 ## Agent Skills
 
@@ -81,6 +84,8 @@ OneShotPrompt wires Agent Skills through `FileAgentSkillsProvider`.
 - Bundled skills are copied with the console app under `skills/` at build and publish time.
 - Custom skills can be added by creating a `skills/` directory next to your active config file.
 - Skills provide reusable instructions and resources. Concrete filesystem reads and writes still happen through tools, because current Agent Framework skill support does not execute scripts.
+- The bundled `tool-selection-optimizer` skill is loaded by a selector agent first, and the next execution agent call receives only the selected tools.
+- If `AllowedTools` is configured, the selector can only choose from that allowlisted subset.
 
 ## Commands
 

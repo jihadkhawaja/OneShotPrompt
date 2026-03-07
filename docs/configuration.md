@@ -40,6 +40,7 @@ Each entry under `Jobs:` supports the following properties:
 - `Prompt`: Required. The task given to the agent.
 - `Provider`: Required. Must be `OpenAI`, `Anthropic`, or `OpenAICompatible`.
 - `AutoApprove`: Optional. Defaults to `false`.
+- `AllowedTools`: Optional comma-separated tool allowlist applied before automatic tool selection.
 - `PersistMemory`: Optional job-level override for the root value.
 - `ThinkingLevel`: Optional job-level override for the root value.
 - `Schedule`: Optional metadata for humans and deployment scripts.
@@ -52,6 +53,12 @@ Each entry under `Jobs:` supports the following properties:
 - `false`: the agent can inspect files and directories only.
 - `true`: the agent can also create directories, move files, copy files, delete files, and write files.
 
+`AllowedTools` is an additional restriction layer. When present, it filters the registered tool catalog before the selector agent runs.
+
+- Use a comma-separated list such as `GetKnownFolder, ListDirectory, ReadTextFile`.
+- Unknown tool names are rejected during config validation.
+- Mutation tools in `AllowedTools` require `AutoApprove: true`.
+
 This is the main safety boundary in the current design. Use `false` for planning or audit-style jobs and `true` only for deterministic automation you trust.
 
 ## Agent Skills
@@ -62,6 +69,8 @@ OneShotPrompt automatically exposes Agent Skills from two locations:
 - A `skills/` directory next to the active config file.
 
 Skills package instructions and references for the agent. They do not replace concrete file I/O in the current runtime, so local reads and writes still happen through the built-in tools.
+
+Bundled skills include a tool-selection optimizer. Before the main execution agent is created, OneShotPrompt runs a selector pass that uses this skill to choose the smallest relevant tool subset for the job. The execution agent then runs with only that selected subset, which keeps jobs more deterministic when many tools are registered.
 
 ## Validation Rules
 
@@ -92,6 +101,7 @@ Jobs:
     Prompt: "Organize files in Downloads by type"
     Provider: "OpenAI"
     AutoApprove: true
+    AllowedTools: "GetKnownFolder, ListDirectory, MoveFile, CreateDirectory"
     PersistMemory: false
     ThinkingLevel: "low"
     Schedule: "Daily at midnight"

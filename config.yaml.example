@@ -22,6 +22,7 @@ Jobs:
     Prompt: "Organize files in Downloads by type"
     Provider: "OpenAI"
     AutoApprove: true
+    AllowedTools: "GetKnownFolder, ListDirectory, MoveFile, CreateDirectory"
     PersistMemory: false
     ThinkingLevel: "low"
     Schedule: "Daily at midnight"

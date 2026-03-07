@@ -58,6 +58,8 @@ public sealed class JobDefinition
 
     public bool Enabled { get; set; } = true;
 
+    public List<string> AllowedTools { get; } = [];
+
     public bool ResolvePersistMemory(AppConfig config) => PersistMemory ?? config.PersistMemory;
 
     public string ResolveThinkingLevel(AppConfig config) => ThinkingLevel ?? config.ThinkingLevel;

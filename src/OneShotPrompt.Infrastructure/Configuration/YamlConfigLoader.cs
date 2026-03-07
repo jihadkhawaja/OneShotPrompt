@@ -276,6 +276,18 @@ public sealed class YamlConfigLoader : IAppConfigLoader
             return;
         }
 
+        if (key.Equals("AllowedTools", StringComparison.OrdinalIgnoreCase))
+        {
+            job.AllowedTools.Clear();
+
+            foreach (var toolName in ParseAllowedTools(value))
+            {
+                job.AllowedTools.Add(toolName);
+            }
+
+            return;
+        }
+
         throw new InvalidOperationException($"Unsupported job setting '{key}'.");
     }
 
@@ -318,7 +330,34 @@ public sealed class YamlConfigLoader : IAppConfigLoader
                 EnsureThinkingLevel(job.ThinkingLevel, $"Jobs[{job.Name}].ThinkingLevel");
             }
 
+            ValidateAllowedTools(job);
+
             ValidateProviderSettings(config, job.Name, provider);
+        }
+    }
+
+    private static void ValidateAllowedTools(JobDefinition job)
+    {
+        var duplicateTool = job.AllowedTools
+            .GroupBy(tool => tool, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(group => group.Count() > 1);
+
+        if (duplicateTool is not null)
+        {
+            throw new InvalidOperationException($"Job '{job.Name}' defines duplicate AllowedTools entry '{duplicateTool.Key}'.");
+        }
+
+        foreach (var toolName in job.AllowedTools)
+        {
+            if (!BuiltInToolCatalog.IsKnown(toolName))
+            {
+                throw new InvalidOperationException($"Job '{job.Name}' uses unknown AllowedTools entry '{toolName}'.");
+            }
+
+            if (!job.AutoApprove && BuiltInToolCatalog.RequiresMutation(toolName))
+            {
+                throw new InvalidOperationException($"Job '{job.Name}' cannot allow mutation tool '{toolName}' when AutoApprove is false.");
+            }
         }
     }
 
@@ -358,6 +397,27 @@ public sealed class YamlConfigLoader : IAppConfigLoader
         {
             throw new InvalidOperationException($"'{location}' must be one of: low, medium, high.");
         }
+    }
+
+    private static List<string> ParseAllowedTools(object value)
+    {
+        var raw = ToStringValue(value).Trim();
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return [];
+        }
+
+        if (raw.StartsWith("[", StringComparison.Ordinal) && raw.EndsWith("]", StringComparison.Ordinal) && raw.Length >= 2)
+        {
+            raw = raw[1..^1];
+        }
+
+        return raw
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(tool => tool.Trim().Trim('"', '\''))
+            .Where(tool => !string.IsNullOrWhiteSpace(tool))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static (string Key, object Value) ParseKeyValue(string line)
