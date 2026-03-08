@@ -102,6 +102,18 @@ public sealed class AgentFactoryReflectionTests
     }
 
     [Fact]
+    public void ParseToolSelectionResponse_ReturnsEmptyForNaturalLanguageWithoutToolLines()
+    {
+        var result = ProcessTestHarness.InvokePrivateStatic(
+            typeof(AgentFactory),
+            "ParseToolSelectionResponse",
+            "No tools are needed for this greeting. The user just said hi.")!;
+
+        Assert.Empty(GetSelectedNames(result));
+        Assert.Null(GetRationale(result));
+    }
+
+    [Fact]
     public void BuildToolDefinitions_AndAllowlist_WorkAsExpected()
     {
         var inspectionJob = new JobDefinition
@@ -124,9 +136,10 @@ public sealed class AgentFactoryReflectionTests
         var filtered = GetToolNames(ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "ApplyAllowlist", mutationJob, mutationToolsObject)!);
 
         Assert.Equal(5, inspectionTools.Count);
-        Assert.Equal(12, mutationTools.Count);
+        Assert.Equal(13, mutationTools.Count);
         Assert.DoesNotContain("WriteTextFile", inspectionTools);
         Assert.Contains("WriteTextFile", mutationTools);
+        Assert.Contains("MoveFiles", mutationTools);
         Assert.Equal(["ReadTextFile", "RunCommand"], filtered.OrderBy(name => name).ToArray());
     }
 

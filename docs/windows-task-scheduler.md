@@ -47,6 +47,7 @@ This creates a daily task that runs only while the current user is logged in.
 
 - The script targets the current Windows user with an interactive logon principal.
 - If your config path contains spaces, the generated scheduled task arguments quote it correctly.
+- Use explicit `run --config ... --job ...` arguments for scheduled tasks. A bare invocation opens the interactive menu when a terminal is attached.
 - If you need a different trigger shape such as weekly or at-logon, use the same action arguments and replace the trigger manually in Task Scheduler.
 
 ## Equivalent Manual Arguments

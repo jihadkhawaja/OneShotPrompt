@@ -1,4 +1,6 @@
+using OneShotPrompt.Application.Abstractions;
 using OneShotPrompt.Core.Models;
+using OneShotPrompt.Infrastructure.Logging;
 using OneShotPrompt.Infrastructure.Persistence;
 using OneShotPrompt.Infrastructure.Tools;
 
@@ -121,6 +123,57 @@ public sealed class InfrastructureTests
     }
 
     [Fact]
+    public void FileSystemTools_MoveFiles_BatchMovesFilesInParallel()
+    {
+        using var workspace = new TestWorkspace();
+        var tools = new FileSystemTools();
+
+        var file1 = workspace.WriteFile("source/a.txt", "alpha");
+        var file2 = workspace.WriteFile("source/b.txt", "bravo");
+        var file3 = workspace.WriteFile("source/c.txt", "charlie");
+
+        var dest1 = workspace.GetPath("dest", "a.txt");
+        var dest2 = workspace.GetPath("dest", "b.txt");
+        var dest3 = workspace.GetPath("dest", "c.txt");
+
+        var result = tools.MoveFiles(
+            $"{file1}|{file2}|{file3}",
+            $"{dest1}|{dest2}|{dest3}");
+
+        Assert.Contains("3 succeeded, 0 failed", result);
+        Assert.Contains("OK:", result);
+        Assert.True(File.Exists(dest1));
+        Assert.True(File.Exists(dest2));
+        Assert.True(File.Exists(dest3));
+        Assert.False(File.Exists(file1));
+        Assert.False(File.Exists(file2));
+        Assert.False(File.Exists(file3));
+    }
+
+    [Fact]
+    public void FileSystemTools_MoveFiles_HandlesValidationAndPartialFailures()
+    {
+        using var workspace = new TestWorkspace();
+        var tools = new FileSystemTools();
+
+        Assert.Equal("No files specified.", tools.MoveFiles("", ""));
+        Assert.Contains("same number of entries", tools.MoveFiles("a", "b|c"));
+
+        var existing = workspace.WriteFile("source/exists.txt", "content");
+        var missing = workspace.GetPath("source", "missing.txt");
+        var dest1 = workspace.GetPath("dest", "exists.txt");
+        var dest2 = workspace.GetPath("dest", "missing.txt");
+
+        var result = tools.MoveFiles(
+            $"{existing}|{missing}",
+            $"{dest1}|{dest2}");
+
+        Assert.Contains("1 succeeded, 1 failed", result);
+        Assert.Contains("OK:", result);
+        Assert.Contains("SKIP:", result);
+    }
+
+    [Fact]
     public async Task ProcessTools_ReturnsValidationAndProcessResults()
     {
         using var workspace = new TestWorkspace();
@@ -167,5 +220,29 @@ public sealed class InfrastructureTests
             Task.FromException<string>(new InvalidOperationException("boom"))))!;
 
         Assert.Equal("<unavailable: boom>", result);
+    }
+
+    [Fact]
+    public async Task FileJobLogger_WritesEventsToLogFile()
+    {
+        using var workspace = new TestWorkspace();
+        var logDirectory = workspace.GetPath("logs");
+
+        await using (var logger = new FileJobLogger(logDirectory))
+        {
+            logger.Emit(new ThinkingEvent());
+            logger.Emit(new ToolCallEvent("ListDirectory", "path: /tmp"));
+            logger.Emit(new ToolResultEvent("ListDirectory", "[dir] foo"));
+            logger.Emit(new JobLogEvent("Job started: test"));
+        }
+
+        var logFiles = Directory.GetFiles(logDirectory, "oneshotprompt-*.log");
+        var logFile = Assert.Single(logFiles);
+        var content = await File.ReadAllTextAsync(logFile);
+
+        Assert.Contains("THINKING", content);
+        Assert.Contains("TOOL_CALL: ListDirectory | path: /tmp", content);
+        Assert.Contains("TOOL_RESULT: ListDirectory | [dir] foo", content);
+        Assert.Contains("LOG: Job started: test", content);
     }
 }

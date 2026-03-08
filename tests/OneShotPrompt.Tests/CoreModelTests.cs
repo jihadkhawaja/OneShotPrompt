@@ -13,6 +13,8 @@ public sealed class CoreModelTests
         Assert.True(BuiltInToolCatalog.RequiresMutation("writeTEXTfile"));
         Assert.False(BuiltInToolCatalog.RequiresMutation("ReadTextFile"));
         Assert.False(BuiltInToolCatalog.RequiresMutation("madeup"));
+        Assert.True(BuiltInToolCatalog.IsKnown("MoveFiles"));
+        Assert.True(BuiltInToolCatalog.RequiresMutation("movefiles"));
     }
 
     [Fact]

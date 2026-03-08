@@ -1,6 +1,10 @@
-﻿using OneShotPrompt.Application.Services;
+﻿using OneShotPrompt.Application.Abstractions;
+using OneShotPrompt.Application.Services;
 using OneShotPrompt.Console.Cli;
+using OneShotPrompt.Console.Rendering;
+using OneShotPrompt.Core.Models;
 using OneShotPrompt.Infrastructure.Configuration;
+using OneShotPrompt.Infrastructure.Logging;
 using OneShotPrompt.Infrastructure.Persistence;
 using OneShotPrompt.Infrastructure.Providers;
 using System.Diagnostics.CodeAnalysis;
@@ -10,12 +14,73 @@ internal static class Program
 {
 	public static Task<int> Main(string[] args)
 	{
+		if (args.Length == 0 && !Console.IsOutputRedirected && !Console.IsInputRedirected)
+		{
+			return InteractiveConsoleMenu.RunAsync();
+		}
+
+		if (args.Length > 0 && args[0] is "interactive" or "-i")
+		{
+			return InteractiveConsoleMenu.RunAsync();
+		}
+
 		return ConsoleApplication.RunAsync(args, Console.Out, Console.Error);
 	}
 }
 
 internal static class ConsoleApplication
 {
+	public static async Task<int> RunAdHocAsync(string configPath, JobDefinition job, TextWriter output, TextWriter error)
+	{
+		var cancellationSource = new CancellationTokenSource();
+
+		void OnCancelKeyPress(object? _, ConsoleCancelEventArgs eventArgs)
+		{
+			eventArgs.Cancel = true;
+			cancellationSource.Cancel();
+		}
+
+		Console.CancelKeyPress += OnCancelKeyPress;
+
+		try
+		{
+			var configDirectory = Path.GetDirectoryName(Path.GetFullPath(configPath)) ?? Environment.CurrentDirectory;
+			var config = await new YamlConfigLoader().LoadAsync(configPath, cancellationSource.Token);
+
+			var sinks = new List<IJobEventSink>
+			{
+				new FileJobLogger(Path.Combine(configDirectory, "logs"))
+			};
+
+			if (ReferenceEquals(output, Console.Out) && !Console.IsOutputRedirected)
+			{
+				sinks.Add(new SpectreJobEventSink());
+			}
+
+			var compositeEventSink = new CompositeJobEventSink([.. sinks]);
+
+			try
+			{
+				var jobRunner = new JobRunner(
+					new YamlConfigLoader(),
+					new AgentFactory(compositeEventSink),
+					new FileExecutionMemoryStore(),
+					compositeEventSink);
+
+				return await jobRunner.RunAdHocAsync(config, job, configDirectory, output, cancellationSource.Token);
+			}
+			finally
+			{
+				await compositeEventSink.DisposeAsync();
+			}
+		}
+		finally
+		{
+			Console.CancelKeyPress -= OnCancelKeyPress;
+			cancellationSource.Dispose();
+		}
+	}
+
 	public static async Task<int> RunAsync(string[] args, TextWriter output, TextWriter error)
 	{
 		var cancellationSource = new CancellationTokenSource();
@@ -49,18 +114,47 @@ internal static class ConsoleApplication
 				return 0;
 			}
 
-			var jobRunner = new JobRunner(
-				new YamlConfigLoader(),
-				new AgentFactory(),
-				new FileExecutionMemoryStore());
+			var configDirectory = Path.GetDirectoryName(Path.GetFullPath(arguments.ConfigPath)) ?? Environment.CurrentDirectory;
+			CompositeJobEventSink? compositeEventSink = null;
 
-			return arguments.Command switch
+			if (arguments.Command is CliCommand.Run)
 			{
-				CliCommand.Run => await jobRunner.RunAsync(arguments.ConfigPath, arguments.JobName, output, cancellationSource.Token),
-				CliCommand.Validate => await jobRunner.ValidateAsync(arguments.ConfigPath, output, cancellationSource.Token),
-				CliCommand.ListJobs => await jobRunner.ListJobsAsync(arguments.ConfigPath, output, cancellationSource.Token),
-				_ => 1,
-			};
+				var sinks = new List<IJobEventSink>
+				{
+					new FileJobLogger(Path.Combine(configDirectory, "logs"))
+				};
+
+				if (ReferenceEquals(output, Console.Out) && !Console.IsOutputRedirected)
+				{
+					sinks.Add(new SpectreJobEventSink());
+				}
+
+				compositeEventSink = new CompositeJobEventSink([.. sinks]);
+			}
+
+			try
+			{
+				var jobRunner = new JobRunner(
+					new YamlConfigLoader(),
+					new AgentFactory(compositeEventSink),
+					new FileExecutionMemoryStore(),
+					compositeEventSink);
+
+				return arguments.Command switch
+				{
+					CliCommand.Run => await jobRunner.RunAsync(arguments.ConfigPath, arguments.JobName, output, cancellationSource.Token),
+					CliCommand.Validate => await jobRunner.ValidateAsync(arguments.ConfigPath, output, cancellationSource.Token),
+					CliCommand.ListJobs => await jobRunner.ListJobsAsync(arguments.ConfigPath, output, cancellationSource.Token),
+					_ => 1,
+				};
+			}
+			finally
+			{
+				if (compositeEventSink is not null)
+				{
+					await compositeEventSink.DisposeAsync();
+				}
+			}
 		}
 		finally
 		{

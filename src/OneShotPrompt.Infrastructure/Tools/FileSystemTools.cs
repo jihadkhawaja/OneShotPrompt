@@ -131,6 +131,56 @@ public sealed class FileSystemTools
         return $"Moved '{sourcePath}' to '{destinationPath}'.";
     }
 
+    [Description("Moves multiple files in parallel for faster batch operations. Provide source and destination paths as pipe-delimited strings (e.g. 'a.txt|b.txt|c.txt'). Both lists must have the same number of entries. Set overwrite=true to replace existing destination files.")]
+    public string MoveFiles(string sourcePaths, string destinationPaths, bool overwrite = false)
+    {
+        if (string.IsNullOrWhiteSpace(sourcePaths) || string.IsNullOrWhiteSpace(destinationPaths))
+        {
+            return "No files specified.";
+        }
+
+        var sources = sourcePaths.Split('|');
+        var destinations = destinationPaths.Split('|');
+
+        if (sources.Length != destinations.Length)
+        {
+            return "sourcePaths and destinationPaths must have the same number of entries.";
+        }
+
+        var results = new string[sources.Length];
+        Parallel.For(0, sources.Length, index =>
+        {
+            try
+            {
+                if (!File.Exists(sources[index]))
+                {
+                    results[index] = $"SKIP: Source not found: {sources[index]}";
+                    return;
+                }
+
+                Directory.CreateDirectory(Path.GetDirectoryName(destinations[index])
+                    ?? throw new InvalidOperationException("Destination directory is invalid."));
+                File.Move(sources[index], destinations[index], overwrite);
+                results[index] = $"OK: {sources[index]} -> {destinations[index]}";
+            }
+            catch (Exception exception)
+            {
+                results[index] = $"FAIL: {sources[index]} -- {exception.Message}";
+            }
+        });
+
+        var succeeded = results.Count(result => result.StartsWith("OK", StringComparison.Ordinal));
+        var builder = new StringBuilder();
+        builder.AppendLine($"Batch move completed: {succeeded} succeeded, {sources.Length - succeeded} failed.");
+
+        foreach (var result in results)
+        {
+            builder.AppendLine(result);
+        }
+
+        return builder.ToString().TrimEnd();
+    }
+
     [Description("Copies a file. Set overwrite=true to replace an existing destination file.")]
     public string CopyFile(string sourcePath, string destinationPath, bool overwrite = false)
     {

@@ -70,6 +70,16 @@ public sealed class CommandLineArgumentsTests
         Assert.Equal("Missing value for --config.", exception.Message);
     }
 
+    [Theory]
+    [InlineData("interactive")]
+    [InlineData("-i")]
+    public void Parse_InteractiveAliases_ReturnInteractiveCommand(string command)
+    {
+        var arguments = CommandLineArguments.Parse([command]);
+
+        Assert.Equal(CliCommand.Interactive, arguments.Command);
+    }
+
     [Fact]
     public void WriteUsage_WritesExpectedCommands()
     {
@@ -82,6 +92,7 @@ public sealed class CommandLineArgumentsTests
         Assert.Contains("run [--config <path>] [--job <name>]", usage);
         Assert.Contains("validate [--config <path>]", usage);
         Assert.Contains("jobs [--config <path>]", usage);
+        Assert.Contains("interactive", usage);
         Assert.Contains("help", usage);
     }
 }

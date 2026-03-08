@@ -62,8 +62,10 @@ Each entry under `Jobs:` supports the following properties:
 Current built-in tools:
 
 - Inspection: `GetKnownFolder`, `ListDirectory`, `ReadTextFile`, `ReadTextFileLines`, `GetTextFileLength`
-- File mutation: `CreateDirectory`, `MoveFile`, `CopyFile`, `DeleteFile`, `WriteTextFile`
+- File mutation: `CreateDirectory`, `MoveFile`, `MoveFiles`, `CopyFile`, `DeleteFile`, `WriteTextFile`
 - Process execution: `RunCommand`, `RunDotNetCommand`
+
+`MoveFiles` accepts pipe-delimited source and destination path strings and moves files concurrently. Prefer it over repeated `MoveFile` calls when organizing many files.
 
 This is the main safety boundary in the current design. Use `false` for planning or audit-style jobs and `true` only for deterministic automation you trust.
 
@@ -107,7 +109,7 @@ Jobs:
     Prompt: "Organize files in Downloads by type"
     Provider: "OpenAI"
     AutoApprove: true
-    AllowedTools: "GetKnownFolder, ListDirectory, MoveFile, CreateDirectory"
+    AllowedTools: "GetKnownFolder, ListDirectory, MoveFile, MoveFiles, CreateDirectory"
     PersistMemory: false
     ThinkingLevel: "low"
     Schedule: "Daily at midnight"

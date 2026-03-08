@@ -61,6 +61,7 @@ Notes:
 
 - Use absolute paths for both the executable and the config file.
 - Redirect output to a log file because cron does not provide an interactive console.
+- Use explicit `run --config ... --job ...` arguments for automation instead of relying on no-argument behavior.
 - Make sure the user running the cron entry can read the config file and write wherever the job needs access.
 
 ## systemd Service And Timer

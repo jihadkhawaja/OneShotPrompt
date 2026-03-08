@@ -20,6 +20,11 @@ public sealed class CommandLineArguments
             return new CommandLineArguments { Command = CliCommand.Help };
         }
 
+        if (args[0] is "interactive" or "-i")
+        {
+            return new CommandLineArguments { Command = CliCommand.Interactive };
+        }
+
         var command = args[0] switch
         {
             "run" => CliCommand.Run,
@@ -62,6 +67,7 @@ public sealed class CommandLineArguments
         writer.WriteLine("  run [--config <path>] [--job <name>]");
         writer.WriteLine("  validate [--config <path>]");
         writer.WriteLine("  jobs [--config <path>]");
+        writer.WriteLine("  interactive");
         writer.WriteLine("  help");
     }
 
@@ -83,4 +89,5 @@ public enum CliCommand
     Run,
     Validate,
     ListJobs,
+    Interactive,
 }

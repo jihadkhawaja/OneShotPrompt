@@ -5,7 +5,8 @@ This project is designed around a small CLI surface. The operational workflow is
 1. Validate the config.
 2. List jobs.
 3. Run all jobs or one named job.
-4. Publish a Native AOT binary if you want scheduled execution without `dotnet run`.
+4. Use the interactive console when you want ad-hoc prompting or menu-driven execution.
+5. Publish a Native AOT binary if you want scheduled execution without `dotnet run`.
 
 ## CLI Commands
 
@@ -57,9 +58,34 @@ PowerShell helper:
 ./scripts/run-job.ps1 -ConfigPath ./config.yaml -JobName downloads-cleanup
 ```
 
+### Interactive Console
+
+```powershell
+dotnet run --project src/OneShotPrompt.Console -- interactive
+```
+
+Short alias:
+
+```powershell
+dotnet run --project src/OneShotPrompt.Console -- -i
+```
+
+If you launch the app with no arguments from an interactive terminal, it opens the same menu automatically. In redirected or scheduled contexts, use explicit commands such as `run --config ...` instead of relying on no-argument behavior.
+
+The interactive console can:
+
+- Run a direct ad-hoc prompt against a selected provider.
+- Run all enabled jobs.
+- Run one selected job.
+- Validate the config.
+- List jobs.
+- Clear persisted memory files under `.oneshotprompt/memory/`.
+
 ## What The App Prints
 
 During a run, the console prints the selected job name, selector telemetry, the model response, and any per-job failure message.
+
+When standard output is attached to an interactive terminal, OneShotPrompt also streams live job events through Spectre.Console, including reasoning text, tool calls, and tool results.
 
 Selector telemetry includes:
 
@@ -78,6 +104,8 @@ Job listing prints one line per job in this format:
 - downloads-cleanup | Provider=OpenAI | Enabled=True | Schedule=Daily at midnight
 ```
 
+Every `run` invocation writes a timestamped log file under `logs/` next to the active config file. Interactive direct prompts write logs there as well.
+
 ## Memory Files
 
 When memory persistence is enabled, each job stores a compact JSON history under:
@@ -91,6 +119,7 @@ Behavior details:
 - Memory lives next to the active config file, not next to the repository root unless the config is there.
 - Each job keeps up to 10 entries.
 - Job names are sanitized before becoming filenames.
+- The interactive `Clear memories` action deletes all `*.json` files in that directory.
 
 ## Publishing
 

@@ -8,7 +8,8 @@ namespace OneShotPrompt.Application.Services;
 public sealed class JobRunner(
     IAppConfigLoader configLoader,
     IJobAgentFactory agentFactory,
-    IExecutionMemoryStore memoryStore)
+    IExecutionMemoryStore memoryStore,
+    IJobEventSink? eventSink = null)
 {
     public async Task<int> RunAsync(string configPath, string? jobName, TextWriter output, CancellationToken cancellationToken)
     {
@@ -30,6 +31,7 @@ public sealed class JobRunner(
         {
             cancellationToken.ThrowIfCancellationRequested();
             await output.WriteLineAsync($"> Running job: {job.Name}");
+            eventSink?.Emit(new JobLogEvent($"Job started: {job.Name}"));
 
             var persistMemory = job.ResolvePersistMemory(config);
             var memory = persistMemory
@@ -47,6 +49,7 @@ public sealed class JobRunner(
 
                 await output.WriteLineAsync(response.Trim());
                 await output.WriteLineAsync(string.Empty);
+                eventSink?.Emit(new JobLogEvent($"Job completed: {job.Name}"));
 
                 if (persistMemory)
                 {
@@ -71,10 +74,39 @@ public sealed class JobRunner(
                 hasFailures = true;
                 await output.WriteLineAsync($"Job '{job.Name}' failed: {exception.Message}");
                 await output.WriteLineAsync(string.Empty);
+                eventSink?.Emit(new JobLogEvent($"Job failed: {job.Name} -- {exception.Message}"));
             }
         }
 
         return hasFailures ? 1 : 0;
+    }
+
+    public async Task<int> RunAdHocAsync(AppConfig config, JobDefinition job, string configDirectory, TextWriter output, CancellationToken cancellationToken)
+    {
+        await output.WriteLineAsync($"> Running ad-hoc prompt ({job.Provider})");
+        eventSink?.Emit(new JobLogEvent("Ad-hoc prompt started"));
+
+        var prompt = BuildAdHocPrompt(config, job);
+
+        try
+        {
+            var preparedAgent = await agentFactory.CreateAsync(config, job, configDirectory, cancellationToken);
+            await WriteToolSelectionSummaryAsync(output, preparedAgent.ToolSelection);
+
+            var response = await preparedAgent.Agent.RunAsync(prompt, cancellationToken);
+
+            await output.WriteLineAsync(response.Trim());
+            await output.WriteLineAsync(string.Empty);
+            eventSink?.Emit(new JobLogEvent("Ad-hoc prompt completed"));
+            return 0;
+        }
+        catch (Exception exception)
+        {
+            await output.WriteLineAsync($"Ad-hoc prompt failed: {exception.Message}");
+            await output.WriteLineAsync(string.Empty);
+            eventSink?.Emit(new JobLogEvent($"Ad-hoc prompt failed: {exception.Message}"));
+            return 1;
+        }
     }
 
     public async Task<int> ValidateAsync(string configPath, TextWriter output, CancellationToken cancellationToken)
@@ -139,6 +171,19 @@ public sealed class JobRunner(
         builder.AppendLine("Task:");
         builder.AppendLine(job.Prompt.Trim());
 
+        return builder.ToString().Trim();
+    }
+
+    private static string BuildAdHocPrompt(AppConfig config, JobDefinition job)
+    {
+        var builder = new StringBuilder();
+        builder.AppendLine($"Provider: {job.Provider}");
+        builder.AppendLine($"Requested reasoning level: {NormalizeThinkingLevel(job.ResolveThinkingLevel(config))}");
+        builder.AppendLine($"Mutation tools available: {(job.AutoApprove ? "yes" : "no")}");
+        builder.AppendLine("Tool usage policy: shortlist the minimum relevant tools first, then use only that shortlist unless blocked.");
+        builder.AppendLine();
+        builder.AppendLine("Task:");
+        builder.AppendLine(job.Prompt.Trim());
         return builder.ToString().Trim();
     }
 

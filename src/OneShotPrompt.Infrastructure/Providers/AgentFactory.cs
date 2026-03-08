@@ -12,7 +12,7 @@ using System.Text;
 
 namespace OneShotPrompt.Infrastructure.Providers;
 
-public sealed class AgentFactory : IJobAgentFactory
+public sealed class AgentFactory(IJobEventSink? eventSink = null) : IJobAgentFactory
 {
     public async Task<PreparedJobAgent> CreateAsync(AppConfig config, JobDefinition job, string configDirectory, CancellationToken cancellationToken)
     {
@@ -28,8 +28,13 @@ public sealed class AgentFactory : IJobAgentFactory
         var chatClient = CreateChatClient(config, provider);
         var selection = await SelectToolsAsync(chatClient, config, job, configDirectory, eligibleTools, cancellationToken);
         var instructions = BuildExecutionInstructions(config, job, availableTools.Count, selection.SelectedTools, job.AllowedTools);
+
+        IChatClient executionClient = eventSink is not null
+            ? new ObservableChatClient(chatClient, eventSink)
+            : chatClient;
+
         var agent = CreateAgent(
-            chatClient,
+            executionClient,
             job.Name,
             selection.SelectedTools.Select(tool => tool.CreateTool()).ToList(),
             instructions,
@@ -118,7 +123,7 @@ public sealed class AgentFactory : IJobAgentFactory
 
         if (parseResult.SelectedNames.Count == 0)
         {
-            return new ToolSelectionDecision(availableTools, true, parseResult.Rationale ?? "Selector did not return explicit tool names, so all eligible tools were kept.");
+            return new ToolSelectionDecision([], true, parseResult.Rationale ?? "Selector did not select any tools.");
         }
 
         var selectedTools = availableTools
@@ -127,7 +132,7 @@ public sealed class AgentFactory : IJobAgentFactory
 
         if (selectedTools.Count == 0)
         {
-            return new ToolSelectionDecision(availableTools, true, parseResult.Rationale ?? "Selector response did not match eligible tools, so all eligible tools were kept.");
+            return new ToolSelectionDecision([], true, parseResult.Rationale ?? "Selector response did not match any eligible tools.");
         }
 
         return new ToolSelectionDecision(selectedTools, true, parseResult.Rationale);
@@ -276,6 +281,7 @@ public sealed class AgentFactory : IJobAgentFactory
         {
             tools.Add(new("CreateDirectory", "Create a directory when the target structure must exist.", true, () => AIFunctionFactory.Create(fileSystemTools.CreateDirectory)));
             tools.Add(new("MoveFile", "Move a file to a new location.", true, () => AIFunctionFactory.Create(fileSystemTools.MoveFile)));
+            tools.Add(new("MoveFiles", "Move multiple files in parallel for faster batch operations.", true, () => AIFunctionFactory.Create(fileSystemTools.MoveFiles)));
             tools.Add(new("CopyFile", "Copy a file to a new location.", true, () => AIFunctionFactory.Create(fileSystemTools.CopyFile)));
             tools.Add(new("DeleteFile", "Delete a file when removal is explicitly required.", true, () => AIFunctionFactory.Create(fileSystemTools.DeleteFile)));
             tools.Add(new("WriteTextFile", "Create or overwrite a UTF-8 text file when the task requires writing content.", true, () => AIFunctionFactory.Create(fileSystemTools.WriteTextFile)));

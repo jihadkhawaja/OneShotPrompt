@@ -11,6 +11,7 @@ public static class BuiltInToolCatalog
         new("GetTextFileLength", false),
         new("CreateDirectory", true),
         new("MoveFile", true),
+        new("MoveFiles", true),
         new("CopyFile", true),
         new("DeleteFile", true),
         new("WriteTextFile", true),
