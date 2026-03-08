@@ -78,7 +78,9 @@ OneShotPrompt automatically exposes Agent Skills from two locations:
 
 Skills package instructions and references for the agent. They do not replace concrete file I/O or process execution in the current runtime, so local actions still happen through the built-in tools.
 
-Bundled skills include a tool-selection optimizer. Before the main execution agent is created, OneShotPrompt runs a selector pass that uses this skill to choose the smallest relevant tool subset for the job. The execution agent then runs with only that selected subset, which keeps jobs more deterministic when many tools are registered.
+Bundled skills include a tool-selection optimizer plus CLI operating guidance for `validate`, `jobs`, `run`, and `interactive`. Before the main execution agent is created, OneShotPrompt runs a selector pass that uses the optimizer skill to choose the smallest relevant tool subset for the job. The execution agent then runs with only that selected subset, which keeps jobs more deterministic when many tools are registered.
+
+The bundled CLI guidance tells agents to prefer explicit subcommands, pass `--config` in scripted contexts, validate before running when config state is uncertain, list jobs before assuming a job name, and treat the active config directory as the runtime root for sibling `skills/`, `logs/`, and `.oneshotprompt/memory/` content.
 
 ## Validation Rules
 

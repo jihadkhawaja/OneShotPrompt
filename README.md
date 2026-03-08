@@ -8,7 +8,7 @@ It uses Microsoft Agent Framework for agent execution, supports OpenAI, Anthropi
 
 - Loads jobs from `config.yaml`.
 - Runs all enabled jobs or a single named job.
-- Loads bundled and user-provided Agent Skills.
+- Loads bundled and user-provided Agent Skills, including guidance for operating the OneShotPrompt CLI itself.
 - Runs an automatic tool-selection pass before execution.
 - Streams live agent activity (thinking, tool calls, results) via Spectre.Console when running interactively.
 - Writes structured logs to a `logs/` folder next to the config file.
