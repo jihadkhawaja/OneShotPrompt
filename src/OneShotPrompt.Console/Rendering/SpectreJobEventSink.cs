@@ -1,7 +1,7 @@
+using System.Diagnostics.CodeAnalysis;
 using OneShotPrompt.Application.Abstractions;
 using OneShotPrompt.Core.Models;
 using Spectre.Console;
-using System.Diagnostics.CodeAnalysis;
 
 namespace OneShotPrompt.Console.Rendering;
 

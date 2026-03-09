@@ -20,6 +20,19 @@ OneShotPrompt reads a single YAML file and validates it before any job runs. Sta
 - `ApiKey`: API key or local token for that endpoint.
 - `Model`: Model name exposed by that endpoint.
 
+### `GitHubCopilot`
+
+- `Model`: Default model name for jobs that set `Provider: "GitHubCopilot"`. Leave it blank to let the CLI choose its default.
+- `CliPath`: Optional explicit path to the GitHub Copilot CLI executable.
+- `CliUrl`: Optional URL for an already running Copilot CLI server. This is mutually exclusive with `CliPath`.
+- `LogLevel`: Optional Copilot CLI log level. The default is `info`.
+- `GitHubToken`: Optional explicit GitHub token for Copilot CLI auth.
+- `UseLoggedInUser`: Optional auth override. When omitted, the SDK defaults to the logged-in user unless `GitHubToken` is set.
+- `AutoStart`: Optional. Defaults to `true`.
+- `AutoRestart`: Optional. Defaults to `true`.
+
+GitHub Copilot jobs require the GitHub Copilot CLI to be installed and authenticated. This runtime keeps Copilot's built-in shell, file, and URL permissions disabled and continues to expose only the selected OneShotPrompt tools for local mutation and inspection.
+
 ### `ThinkingLevel`
 
 Allowed values are `low`, `medium`, or `high`.
@@ -38,7 +51,7 @@ Each entry under `Jobs:` supports the following properties:
 
 - `Name`: Required. Must be unique across the file.
 - `Prompt`: Required. The task given to the agent.
-- `Provider`: Required. Must be `OpenAI`, `Anthropic`, or `OpenAICompatible`.
+- `Provider`: Required. Must be `OpenAI`, `Anthropic`, `OpenAICompatible`, or `GitHubCopilot`.
 - `AutoApprove`: Optional. Defaults to `false`.
 - `AllowedTools`: Optional comma-separated tool allowlist applied before automatic tool selection.
 - `PersistMemory`: Optional job-level override for the root value.
@@ -91,6 +104,8 @@ The application rejects a config when any of these are true:
 - A job is missing `Name`.
 - A job is missing `Prompt`.
 - `Provider` is not one of the supported values.
+- `GitHubCopilot.CliUrl` and `GitHubCopilot.CliPath` are both set.
+- `GitHubCopilot.CliUrl` is combined with `GitHubCopilot.GitHubToken` or `GitHubCopilot.UseLoggedInUser`.
 - `ThinkingLevel` is not `low`, `medium`, or `high`.
 - The file contains unsupported YAML sections or properties.
 
@@ -106,6 +121,15 @@ OpenAI:
 Anthropic:
   ApiKey: ""
   Model: "claude-haiku-4-5"
+
+GitHubCopilot:
+  Model: "gpt-5"
+  CliPath: ""
+  CliUrl: ""
+  LogLevel: "info"
+  GitHubToken: ""
+  AutoStart: true
+  AutoRestart: true
 
 ThinkingLevel: "low"
 PersistMemory: true

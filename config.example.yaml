@@ -11,6 +11,17 @@ OpenAICompatible:
   ApiKey: "lm-studio"
   Model: "default"
 
+GitHubCopilot:
+  Model: "gpt-4.1"
+  CliPath: ""
+  CliUrl: ""
+  LogLevel: "info"
+  GitHubToken: ""
+  # Set UseLoggedInUser to false only when you want to force explicit token auth.
+  # UseLoggedInUser: true
+  AutoStart: true
+  AutoRestart: true
+
 ThinkingLevel: "low"
 
 PersistMemory: true
@@ -33,6 +44,15 @@ Jobs:
     Provider: "Anthropic"
     AutoApprove: true
     AllowedTools: "RunDotNetCommand, ReadTextFile, ListDirectory"
+    PersistMemory: false
+    ThinkingLevel: "medium"
+    Enabled: false
+
+  - Name: "copilot-repo-audit"
+    Prompt: "Inspect the repository next to this config file and summarize the highest-risk issues without making changes."
+    Provider: "GitHubCopilot"
+    AutoApprove: false
+    AllowedTools: "ListDirectory, ReadTextFile, ReadTextFileLines, GetTextFileLength"
     PersistMemory: false
     ThinkingLevel: "medium"
     Enabled: false

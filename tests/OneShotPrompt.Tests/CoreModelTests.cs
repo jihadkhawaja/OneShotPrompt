@@ -49,13 +49,25 @@ public sealed class CoreModelTests
         Assert.Same(agent, prepared.Agent);
         Assert.Same(summary, prepared.ToolSelection);
         Assert.Equal("done", await prepared.Agent.RunAsync("prompt", CancellationToken.None));
+
+        await prepared.DisposeAsync();
+
+        Assert.True(agent.Disposed);
     }
 
-    private sealed class StubJobAgent(string response) : IJobAgent
+    private sealed class StubJobAgent(string response) : IJobAgent, IAsyncDisposable
     {
+        public bool Disposed { get; private set; }
+
         public Task<string> RunAsync(string prompt, CancellationToken cancellationToken)
         {
             return Task.FromResult(response);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            Disposed = true;
+            return ValueTask.CompletedTask;
         }
     }
 }

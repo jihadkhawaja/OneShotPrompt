@@ -1,5 +1,9 @@
+using System.ClientModel;
+using System.Text;
 using Anthropic;
+using GitHub.Copilot.SDK;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.GitHub.Copilot;
 using Microsoft.Extensions.AI;
 using OneShotPrompt.Application.Abstractions;
 using OneShotPrompt.Core.Enums;
@@ -7,8 +11,6 @@ using OneShotPrompt.Core.Models;
 using OneShotPrompt.Infrastructure.Tools;
 using OpenAI;
 using OpenAI.Chat;
-using System.ClientModel;
-using System.Text;
 
 namespace OneShotPrompt.Infrastructure.Providers;
 
@@ -25,20 +27,24 @@ public sealed class AgentFactory(IJobEventSink? eventSink = null) : IJobAgentFac
 
         var availableTools = BuildToolDefinitions(job, configDirectory);
         var eligibleTools = ApplyAllowlist(job, availableTools);
-        var chatClient = CreateChatClient(config, provider);
-        var selection = await SelectToolsAsync(chatClient, config, job, configDirectory, eligibleTools, cancellationToken);
+        var selection = provider switch
+        {
+            JobProvider.GitHubCopilot => await SelectToolsWithGitHubCopilotAsync(config, job, configDirectory, eligibleTools, cancellationToken),
+            _ => await SelectToolsAsync(CreateChatClient(config, provider), config, job, configDirectory, eligibleTools, cancellationToken),
+        };
         var instructions = BuildExecutionInstructions(config, job, availableTools.Count, selection.SelectedTools, job.AllowedTools);
+        var selectedFunctions = CreateFunctionTools(selection.SelectedTools);
 
-        IChatClient executionClient = eventSink is not null
-            ? new ObservableChatClient(chatClient, eventSink)
-            : chatClient;
-
-        var agent = CreateAgent(
-            executionClient,
-            job.Name,
-            selection.SelectedTools.Select(tool => tool.CreateTool()).ToList(),
-            instructions,
-            configDirectory);
+        var agent = provider switch
+        {
+            JobProvider.GitHubCopilot => CreateGitHubCopilotAgent(
+                config.GitHubCopilot,
+                job.Name,
+                selectedFunctions,
+                instructions,
+                configDirectory),
+            _ => CreateChatClientAgent(config, provider, job.Name, selectedFunctions, instructions, configDirectory),
+        };
 
         return new PreparedJobAgent(
             new AgentFrameworkJobAgent(agent),
@@ -73,6 +79,132 @@ public sealed class AgentFactory(IJobEventSink? eventSink = null) : IJobAgentFac
             }.AsIChatClient(config.Anthropic.Model),
             _ => throw new InvalidOperationException($"Unsupported provider '{provider}'."),
         };
+    }
+
+    private AIAgent CreateChatClientAgent(
+        AppConfig config,
+        JobProvider provider,
+        string agentName,
+        IList<AIFunction> tools,
+        string instructions,
+        string configDirectory)
+    {
+        var chatClient = CreateChatClient(config, provider);
+
+        IChatClient executionClient = eventSink is not null
+            ? new ObservableChatClient(chatClient, eventSink)
+            : chatClient;
+
+        return CreateAgent(
+            executionClient,
+            agentName,
+            tools.Cast<AITool>().ToList(),
+            instructions,
+            configDirectory);
+    }
+
+    private static AIAgent CreateGitHubCopilotAgent(
+        GitHubCopilotProviderSettings settings,
+        string agentName,
+        IList<AIFunction> tools,
+        string instructions,
+        string configDirectory)
+    {
+        var client = new CopilotClient(CreateGitHubCopilotClientOptions(settings, configDirectory));
+
+        return new GitHubCopilotAgent(
+            client,
+            CreateGitHubCopilotSessionConfig(settings, tools, instructions, configDirectory),
+            ownsClient: true,
+            name: agentName,
+            description: $"OneShotPrompt agent for job '{agentName}'.");
+    }
+
+    private static CopilotClientOptions CreateGitHubCopilotClientOptions(GitHubCopilotProviderSettings settings, string configDirectory)
+    {
+        var options = new CopilotClientOptions
+        {
+            AutoStart = settings.AutoStart,
+            AutoRestart = settings.AutoRestart,
+            Cwd = configDirectory,
+            LogLevel = string.IsNullOrWhiteSpace(settings.LogLevel) ? "info" : settings.LogLevel,
+        };
+
+        if (!string.IsNullOrWhiteSpace(settings.CliPath))
+        {
+            options.CliPath = settings.CliPath;
+        }
+
+        if (!string.IsNullOrWhiteSpace(settings.CliUrl))
+        {
+            options.CliUrl = settings.CliUrl;
+        }
+
+        if (!string.IsNullOrWhiteSpace(settings.GitHubToken))
+        {
+            options.GitHubToken = settings.GitHubToken;
+        }
+
+        if (settings.UseLoggedInUser.HasValue)
+        {
+            options.UseLoggedInUser = settings.UseLoggedInUser.Value;
+        }
+
+        return options;
+    }
+
+    private static SessionConfig CreateGitHubCopilotSessionConfig(
+        GitHubCopilotProviderSettings settings,
+        IList<AIFunction> tools,
+        string instructions,
+        string configDirectory)
+    {
+        var skillPaths = GetSkillPaths(configDirectory);
+        if (skillPaths.Count == 0)
+        {
+            throw new InvalidOperationException("No skill directories are available.");
+        }
+
+        return new SessionConfig
+        {
+            ClientName = "OneShotPrompt",
+            ConfigDir = configDirectory,
+            Model = string.IsNullOrWhiteSpace(settings.Model) ? null : settings.Model,
+            OnPermissionRequest = DenyGitHubCopilotPermissionRequestAsync,
+            SkillDirectories = skillPaths,
+            SystemMessage = new SystemMessageConfig
+            {
+                Mode = SystemMessageMode.Append,
+                Content = instructions,
+            },
+            Tools = tools,
+            WorkingDirectory = configDirectory,
+        };
+    }
+
+    private static Task<PermissionRequestResult> DenyGitHubCopilotPermissionRequestAsync(PermissionRequest _, PermissionInvocation __)
+    {
+        return Task.FromResult(new PermissionRequestResult
+        {
+            Kind = "denied-no-approval-rule-and-could-not-request-from-user",
+        });
+    }
+
+    private static List<AIFunction> CreateFunctionTools(IReadOnlyList<ToolDefinition> selectedTools)
+    {
+        var functions = new List<AIFunction>(selectedTools.Count);
+
+        foreach (var tool in selectedTools)
+        {
+            if (tool.CreateTool() is not AIFunction function)
+            {
+                throw new InvalidOperationException($"Tool '{tool.Name}' is not compatible with the GitHub Copilot provider.");
+            }
+
+            functions.Add(function);
+        }
+
+        return functions;
     }
 
     private static AIAgent CreateAgent(IChatClient chatClient, string agentName, IList<AITool> tools, string instructions, string configDirectory)
@@ -138,10 +270,56 @@ public sealed class AgentFactory(IJobEventSink? eventSink = null) : IJobAgentFac
         return new ToolSelectionDecision(selectedTools, true, parseResult.Rationale);
     }
 
+    private static async Task<ToolSelectionDecision> SelectToolsWithGitHubCopilotAsync(
+        AppConfig config,
+        JobDefinition job,
+        string configDirectory,
+        IReadOnlyList<ToolDefinition> availableTools,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (availableTools.Count == 0)
+        {
+            return new ToolSelectionDecision([], false, "No eligible tools remained after allowlist filtering.");
+        }
+
+        if (availableTools.Count == 1)
+        {
+            return new ToolSelectionDecision(availableTools, false, "Selector skipped because exactly one eligible tool was available.");
+        }
+
+        await using var selector = new AgentFrameworkJobAgent(CreateGitHubCopilotAgent(
+            config.GitHubCopilot,
+            $"{job.Name}-tool-selector",
+            [],
+            BuildToolSelectionInstructions(config, job, availableTools.Count),
+            configDirectory));
+
+        var response = await selector.RunAsync(BuildToolSelectionPrompt(config, job, availableTools), cancellationToken);
+        var parseResult = ParseToolSelectionResponse(response);
+
+        if (parseResult.SelectedNames.Count == 0)
+        {
+            return new ToolSelectionDecision([], true, parseResult.Rationale ?? "Selector did not select any tools.");
+        }
+
+        var selectedTools = availableTools
+            .Where(tool => parseResult.SelectedNames.Contains(tool.Name, StringComparer.OrdinalIgnoreCase))
+            .ToList();
+
+        if (selectedTools.Count == 0)
+        {
+            return new ToolSelectionDecision([], true, parseResult.Rationale ?? "Selector response did not match any eligible tools.");
+        }
+
+        return new ToolSelectionDecision(selectedTools, true, parseResult.Rationale);
+    }
+
     private static string BuildToolSelectionInstructions(AppConfig config, JobDefinition job, int toolCount)
     {
-        return string.Join(
-            Environment.NewLine,
+        var lines = new List<string>
+        {
             "You are a preflight tool-selection agent.",
             "Load and apply the tool-selection-optimizer skill before deciding anything.",
             "Your only job is to choose the smallest sufficient subset of tools for the next execution agent call.",
@@ -151,10 +329,17 @@ public sealed class AgentFactory(IJobEventSink? eventSink = null) : IJobAgentFac
             job.AutoApprove
                 ? "Mutation tools exist, but only select them when the task clearly requires mutation."
                 : "Mutation tools are unavailable, so prefer inspection-only planning.",
-            $"Requested reasoning level: {job.ResolveThinkingLevel(config)}.",
             "Return one selected tool per line using exactly: TOOL: <tool-name>.",
             "If no tools are needed, return exactly: TOOL: NONE.",
-            "Optionally end with one RATIONALE line.");
+            "Optionally end with one RATIONALE line.",
+        };
+
+        if (!IsGitHubCopilotJob(job))
+        {
+            lines.Insert(7, $"Requested reasoning level: {job.ResolveThinkingLevel(config)}.");
+        }
+
+        return string.Join(Environment.NewLine, lines);
     }
 
     private static string BuildExecutionInstructions(AppConfig config, JobDefinition job, int totalToolCount, IReadOnlyList<ToolDefinition> selectedTools, IReadOnlyList<string> allowedTools)
@@ -165,9 +350,8 @@ public sealed class AgentFactory(IJobEventSink? eventSink = null) : IJobAgentFac
         var allowlistText = allowedTools.Count == 0
             ? "none"
             : string.Join(", ", allowedTools);
-
-        return string.Join(
-            Environment.NewLine,
+        var lines = new List<string>
+        {
             "You are an automation agent executing a single one-shot job.",
             "Load and use the available skills when their domain matches the task.",
             "A separate selector pass already narrowed the tool set for this run.",
@@ -177,15 +361,24 @@ public sealed class AgentFactory(IJobEventSink? eventSink = null) : IJobAgentFac
             "Only the selected tools are registered for this agent.",
             "Use concrete tools only for actions that skills cannot perform directly.",
             "Do not call tools speculatively or 'just in case'.",
-            "Keep tool use minimal and expand the plan through reasoning before acting.",
+            IsGitHubCopilotJob(job)
+                ? "Keep tool use minimal before acting."
+                : "Keep tool use minimal and expand the plan through reasoning before acting.",
             "RunCommand and RunDotNetCommand execute a process directly without shell syntax, so do not rely on pipes, redirection, shell built-ins, or &&.",
             "Never claim that a file-system change happened unless a tool call actually succeeded.",
             job.AutoApprove
                 ? "Mutation tools are available only if they survived the selector pass. Keep changes minimal and deterministic."
                 : "Mutation tools are not available. If the task requires changes, inspect the environment and return a concrete action plan instead.",
-            $"Requested reasoning level: {job.ResolveThinkingLevel(config)}.",
             "If you are blocked because an omitted tool would be required, say so explicitly instead of improvising.",
-            "Finish with a concise execution summary.");
+            "Finish with a concise execution summary.",
+        };
+
+        if (!IsGitHubCopilotJob(job))
+        {
+            lines.Insert(13, $"Requested reasoning level: {job.ResolveThinkingLevel(config)}.");
+        }
+
+        return string.Join(Environment.NewLine, lines);
     }
 
     private static string BuildToolSelectionPrompt(AppConfig config, JobDefinition job, IReadOnlyList<ToolDefinition> availableTools)
@@ -194,7 +387,10 @@ public sealed class AgentFactory(IJobEventSink? eventSink = null) : IJobAgentFac
         builder.AppendLine("Select the minimum sufficient tool subset for the next agent call.");
         builder.AppendLine($"Job: {job.Name}");
         builder.AppendLine($"Provider: {job.Provider}");
-        builder.AppendLine($"Requested reasoning level: {job.ResolveThinkingLevel(config)}");
+        if (!IsGitHubCopilotJob(job))
+        {
+            builder.AppendLine($"Requested reasoning level: {job.ResolveThinkingLevel(config)}");
+        }
         builder.AppendLine($"Mutation tools available: {(job.AutoApprove ? "yes" : "no")}");
         builder.AppendLine();
         builder.AppendLine("Task:");
@@ -210,6 +406,11 @@ public sealed class AgentFactory(IJobEventSink? eventSink = null) : IJobAgentFac
         builder.AppendLine();
         builder.AppendLine("Return only TOOL lines and an optional final RATIONALE line.");
         return builder.ToString().TrimEnd();
+    }
+
+    private static bool IsGitHubCopilotJob(JobDefinition job)
+    {
+        return job.Provider.Equals(nameof(JobProvider.GitHubCopilot), StringComparison.OrdinalIgnoreCase);
     }
 
     private static ToolSelectionParseResult ParseToolSelectionResponse(string? response)
@@ -298,7 +499,7 @@ public sealed class AgentFactory(IJobEventSink? eventSink = null) : IJobAgentFac
 
     private sealed record ToolSelectionParseResult(HashSet<string> SelectedNames, string? Rationale);
 
-    #pragma warning disable MAAI001
+#pragma warning disable MAAI001
     private static AIContextProvider CreateSkillsProvider(string configDirectory)
     {
         var skillPaths = GetSkillPaths(configDirectory);
@@ -310,7 +511,7 @@ public sealed class AgentFactory(IJobEventSink? eventSink = null) : IJobAgentFac
             _ => new FileAgentSkillsProvider(skillPaths, options: null, loggerFactory: null),
         };
     }
-    #pragma warning restore MAAI001
+#pragma warning restore MAAI001
 
     private static List<string> GetSkillPaths(string configDirectory)
     {

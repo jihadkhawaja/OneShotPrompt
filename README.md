@@ -2,7 +2,7 @@
 
 OneShotPrompt is a .NET 10 console application for running one-shot AI jobs from YAML configuration.
 
-It uses Microsoft Agent Framework for agent execution, supports OpenAI, Anthropic, and OpenAI-compatible endpoints, persists lightweight job memory when enabled, and is configured for Native AOT publishing by default.
+It uses Microsoft Agent Framework for agent execution, supports OpenAI, Anthropic, OpenAI-compatible endpoints, and GitHub Copilot, persists lightweight job memory when enabled, and is configured for Native AOT publishing by default.
 
 ## What It Does
 
@@ -25,7 +25,7 @@ flowchart LR
   Selector --> Agent["Execution agent"]
   Agent --> Tools["Filesystem + process tools"]
   Agent --> Memory["Per-job memory"]
-  Agent --> Providers["OpenAI / Anthropic / Compatible APIs"]
+  Agent --> Providers["OpenAI / Anthropic / Compatible APIs / GitHub Copilot"]
   Agent --> Events["Job events"]
   Events --> Terminal["Spectre.Console live view"]
   Events --> Logs["logs/*.log"]
@@ -37,6 +37,8 @@ flowchart LR
 2. Fill in the provider settings you need and add at least one job.
 3. Validate the config.
 4. List jobs or run one.
+
+GitHub Copilot jobs additionally require the GitHub Copilot CLI to be installed and authenticated before the job runs.
 
 ```powershell
 dotnet run --project src/OneShotPrompt.Console -- validate --config config.yaml
@@ -107,6 +109,7 @@ Every `run` command writes a timestamped log file to `logs/` next to the active 
 - `MoveFiles` moves multiple files in parallel for faster batch operations.
 - `interactive` and `-i` open the Spectre.Console menu explicitly.
 - `AllowedTools` can further restrict the tool catalog before selection.
+- `GitHubCopilot` jobs keep Copilot CLI shell, file, and URL permissions disabled; local actions still flow through the selected built-in OneShotPrompt tools.
 - Custom skills can be placed in a `skills/` directory next to the active config file.
 - Job memory is stored in `.oneshotprompt/memory/` next to the active config file.
 

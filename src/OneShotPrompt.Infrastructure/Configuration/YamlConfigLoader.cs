@@ -52,6 +52,9 @@ public sealed class YamlConfigLoader : IAppConfigLoader
                     case "OpenAICompatible":
                         ParseProviderSection(lines, ref index, 2, AssignOpenAICompatible);
                         break;
+                    case "GitHubCopilot":
+                        ParseProviderSection(lines, ref index, 2, AssignGitHubCopilot);
+                        break;
                     case "Jobs":
                         ParseJobs(lines, ref index, config.Jobs);
                         break;
@@ -124,6 +127,59 @@ public sealed class YamlConfigLoader : IAppConfigLoader
             }
 
             throw new InvalidOperationException($"Unsupported OpenAICompatible setting '{key}'.");
+        }
+
+        void AssignGitHubCopilot(string key, object value)
+        {
+            if (key.Equals("Model", StringComparison.OrdinalIgnoreCase))
+            {
+                config.GitHubCopilot.Model = ToStringValue(value);
+                return;
+            }
+
+            if (key.Equals("CliPath", StringComparison.OrdinalIgnoreCase))
+            {
+                config.GitHubCopilot.CliPath = ToStringValue(value);
+                return;
+            }
+
+            if (key.Equals("CliUrl", StringComparison.OrdinalIgnoreCase))
+            {
+                config.GitHubCopilot.CliUrl = ToStringValue(value);
+                return;
+            }
+
+            if (key.Equals("LogLevel", StringComparison.OrdinalIgnoreCase))
+            {
+                config.GitHubCopilot.LogLevel = ToStringValue(value);
+                return;
+            }
+
+            if (key.Equals("GitHubToken", StringComparison.OrdinalIgnoreCase))
+            {
+                config.GitHubCopilot.GitHubToken = ToStringValue(value);
+                return;
+            }
+
+            if (key.Equals("UseLoggedInUser", StringComparison.OrdinalIgnoreCase))
+            {
+                config.GitHubCopilot.UseLoggedInUser = ToBoolValue(value, key);
+                return;
+            }
+
+            if (key.Equals("AutoStart", StringComparison.OrdinalIgnoreCase))
+            {
+                config.GitHubCopilot.AutoStart = ToBoolValue(value, key);
+                return;
+            }
+
+            if (key.Equals("AutoRestart", StringComparison.OrdinalIgnoreCase))
+            {
+                config.GitHubCopilot.AutoRestart = ToBoolValue(value, key);
+                return;
+            }
+
+            throw new InvalidOperationException($"Unsupported GitHubCopilot setting '{key}'.");
         }
     }
 
@@ -378,8 +434,25 @@ public sealed class YamlConfigLoader : IAppConfigLoader
                 EnsureRequired(config.OpenAICompatible.ApiKey, jobName, "OpenAICompatible.ApiKey");
                 EnsureRequired(config.OpenAICompatible.Model, jobName, "OpenAICompatible.Model");
                 break;
+            case JobProvider.GitHubCopilot:
+                ValidateGitHubCopilotSettings(config.GitHubCopilot, jobName);
+                break;
             default:
                 throw new InvalidOperationException($"Job '{jobName}' uses unsupported provider '{provider}'.");
+        }
+    }
+
+    private static void ValidateGitHubCopilotSettings(GitHubCopilotProviderSettings settings, string jobName)
+    {
+        if (!string.IsNullOrWhiteSpace(settings.CliUrl) && !string.IsNullOrWhiteSpace(settings.CliPath))
+        {
+            throw new InvalidOperationException($"Job '{jobName}' cannot set both 'GitHubCopilot.CliUrl' and 'GitHubCopilot.CliPath'.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(settings.CliUrl) &&
+            (!string.IsNullOrWhiteSpace(settings.GitHubToken) || settings.UseLoggedInUser.HasValue))
+        {
+            throw new InvalidOperationException($"Job '{jobName}' cannot combine 'GitHubCopilot.CliUrl' with 'GitHubCopilot.GitHubToken' or 'GitHubCopilot.UseLoggedInUser'.");
         }
     }
 

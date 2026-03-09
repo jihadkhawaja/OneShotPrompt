@@ -207,6 +207,32 @@ public sealed class JobRunnerTests
     }
 
     [Fact]
+    public async Task RunAsync_DisposesPreparedAgentAfterExecution()
+    {
+        var config = CreateConfig(new JobDefinition
+        {
+            Name = "dispose",
+            Prompt = "noop",
+            Provider = "OpenAI",
+        });
+
+        var agent = new DisposableFakeJobAgent("done");
+        var runner = new JobRunner(
+            new FakeConfigLoader(config),
+            new FakeJobAgentFactory
+            {
+                PreparedAgent = new PreparedJobAgent(agent, new ToolSelectionSummary())
+            },
+            new FakeExecutionMemoryStore());
+
+        using var writer = new StringWriter();
+        var exitCode = await runner.RunAsync("config.yaml", null, writer, CancellationToken.None);
+
+        Assert.Equal(0, exitCode);
+        Assert.True(agent.Disposed);
+    }
+
+    [Fact]
     public async Task ValidateAsync_WritesJobCount()
     {
         var config = CreateConfig(
@@ -321,6 +347,22 @@ public sealed class JobRunnerTests
         {
             LastPrompt = prompt;
             return Task.FromResult(response);
+        }
+    }
+
+    private sealed class DisposableFakeJobAgent(string response) : IJobAgent, IAsyncDisposable
+    {
+        public bool Disposed { get; private set; }
+
+        public Task<string> RunAsync(string prompt, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(response);
+        }
+
+        public ValueTask DisposeAsync()
+        {
+            Disposed = true;
+            return ValueTask.CompletedTask;
         }
     }
 }

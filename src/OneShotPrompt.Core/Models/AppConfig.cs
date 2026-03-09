@@ -10,6 +10,8 @@ public sealed class AppConfig
 
     public OpenAICompatibleProviderSettings OpenAICompatible { get; } = new();
 
+    public GitHubCopilotProviderSettings GitHubCopilot { get; } = new();
+
     public string ThinkingLevel { get; set; } = "low";
 
     public bool PersistMemory { get; set; } = true;
@@ -38,6 +40,25 @@ public sealed class OpenAICompatibleProviderSettings
     public string ApiKey { get; set; } = "lm-studio";
 
     public string Model { get; set; } = "default";
+}
+
+public sealed class GitHubCopilotProviderSettings
+{
+    public string Model { get; set; } = "gpt-5";
+
+    public string CliPath { get; set; } = string.Empty;
+
+    public string CliUrl { get; set; } = string.Empty;
+
+    public string LogLevel { get; set; } = "info";
+
+    public string GitHubToken { get; set; } = string.Empty;
+
+    public bool? UseLoggedInUser { get; set; }
+
+    public bool AutoStart { get; set; } = true;
+
+    public bool AutoRestart { get; set; } = true;
 }
 
 public sealed class JobDefinition

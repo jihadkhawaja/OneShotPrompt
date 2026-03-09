@@ -23,6 +23,12 @@ public sealed class YamlConfigLoaderTests
               Endpoint: http://localhost:1234/v1
               ApiKey: compat-key
               Model: compat-model
+            GitHubCopilot:
+              Model: gpt-5
+              CliPath: C:/tools/copilot.exe
+              LogLevel: debug
+              AutoStart: false
+              AutoRestart: false
             Jobs:
               - Name: Example
                 Prompt: "Do useful work"
@@ -42,6 +48,11 @@ public sealed class YamlConfigLoaderTests
         Assert.Equal("openai-key", config.OpenAI.ApiKey);
         Assert.Equal("claude-test", config.Anthropic.Model);
         Assert.Equal("http://localhost:1234/v1", config.OpenAICompatible.Endpoint);
+        Assert.Equal("gpt-5", config.GitHubCopilot.Model);
+        Assert.Equal("C:/tools/copilot.exe", config.GitHubCopilot.CliPath);
+        Assert.Equal("debug", config.GitHubCopilot.LogLevel);
+        Assert.False(config.GitHubCopilot.AutoStart);
+        Assert.False(config.GitHubCopilot.AutoRestart);
 
         var job = Assert.Single(config.Jobs);
         Assert.Equal("Example", job.Name);
@@ -243,6 +254,34 @@ public sealed class YamlConfigLoaderTests
             """);
 
         Assert.Equal("Job 'Daily' requires 'OpenAICompatible.Endpoint' to be configured.", compatible.Message);
+    }
+
+    [Fact]
+    public async Task LoadAsync_RejectsInvalidGitHubCopilotCombinations()
+    {
+        var bothConnectionModes = await LoadInvalidConfigAsync("""
+            GitHubCopilot:
+              CliPath: C:/tools/copilot.exe
+              CliUrl: http://localhost:3000
+            Jobs:
+              - Name: Daily
+                Prompt: first
+                Provider: GitHubCopilot
+            """);
+
+        Assert.Equal("Job 'Daily' cannot set both 'GitHubCopilot.CliUrl' and 'GitHubCopilot.CliPath'.", bothConnectionModes.Message);
+
+        var externalServerWithAuth = await LoadInvalidConfigAsync("""
+            GitHubCopilot:
+              CliUrl: http://localhost:3000
+              GitHubToken: token
+            Jobs:
+              - Name: Daily
+                Prompt: first
+                Provider: GitHubCopilot
+            """);
+
+        Assert.Equal("Job 'Daily' cannot combine 'GitHubCopilot.CliUrl' with 'GitHubCopilot.GitHubToken' or 'GitHubCopilot.UseLoggedInUser'.", externalServerWithAuth.Message);
     }
 
     [Fact]

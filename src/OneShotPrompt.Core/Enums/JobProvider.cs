@@ -5,4 +5,5 @@ public enum JobProvider
     OpenAI,
     Anthropic,
     OpenAICompatible,
+    GitHubCopilot,
 }

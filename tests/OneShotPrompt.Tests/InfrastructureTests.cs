@@ -1,4 +1,3 @@
-using OneShotPrompt.Application.Abstractions;
 using OneShotPrompt.Core.Models;
 using OneShotPrompt.Infrastructure.Logging;
 using OneShotPrompt.Infrastructure.Persistence;
@@ -8,6 +7,43 @@ namespace OneShotPrompt.Tests;
 
 public sealed class InfrastructureTests
 {
+    [Fact]
+    public void AgentFrameworkJobAgent_NormalizeResponseText_CollapsesRepeatedCopilotOutput()
+    {
+        var response = "Hello! How can I assist you with your project today?Hello! How can I assist you with your project today?";
+        var agentType = Type.GetType("OneShotPrompt.Infrastructure.Providers.AgentFrameworkJobAgent, OneShotPrompt.Infrastructure")!;
+
+        var normalized = (string)ProcessTestHarness.InvokePrivateStatic(
+            agentType,
+            "NormalizeResponseText",
+            response,
+            true)!;
+
+        Assert.Equal("Hello! How can I assist you with your project today?", normalized);
+    }
+
+    [Fact]
+    public void AgentFrameworkJobAgent_NormalizeResponseText_PreservesNonCopilotOrNonRepeatedOutput()
+    {
+        const string response = "Hello! How can I assist you with your project today?";
+        var agentType = Type.GetType("OneShotPrompt.Infrastructure.Providers.AgentFrameworkJobAgent, OneShotPrompt.Infrastructure")!;
+
+        var nonCopilot = (string)ProcessTestHarness.InvokePrivateStatic(
+            agentType,
+            "NormalizeResponseText",
+            response,
+            false)!;
+
+        var nonRepeatedCopilot = (string)ProcessTestHarness.InvokePrivateStatic(
+            agentType,
+            "NormalizeResponseText",
+            response,
+            true)!;
+
+        Assert.Equal(response, nonCopilot);
+        Assert.Equal(response, nonRepeatedCopilot);
+    }
+
     [Fact]
     public async Task FileExecutionMemoryStore_LoadMissing_ReturnsEmptyDocument()
     {

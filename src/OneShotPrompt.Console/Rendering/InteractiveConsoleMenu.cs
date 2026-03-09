@@ -1,8 +1,8 @@
-using OneShotPrompt.Console.Cli;
+using System.Diagnostics.CodeAnalysis;
+using OneShotPrompt.Core.Enums;
 using OneShotPrompt.Core.Models;
 using OneShotPrompt.Infrastructure.Configuration;
 using Spectre.Console;
-using System.Diagnostics.CodeAnalysis;
 
 namespace OneShotPrompt.Console.Rendering;
 
@@ -61,11 +61,13 @@ internal static class InteractiveConsoleMenu
 
     private static async Task<int> RunDirectPromptAsync(string configPath)
     {
+        var providers = Enum.GetNames<JobProvider>();
+
         var provider = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
                 .Title("[blue]Provider:[/]")
                 .HighlightStyle("yellow")
-                .AddChoices("OpenAI", "Anthropic", "OpenAICompatible"));
+                .AddChoices(providers));
 
         var autoApprove = AnsiConsole.Confirm("[blue]Allow mutation tools?[/]", false);
 

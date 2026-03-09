@@ -1,4 +1,5 @@
-using System.Reflection;
+using GitHub.Copilot.SDK;
+using Microsoft.Extensions.AI;
 using OneShotPrompt.Core.Enums;
 using OneShotPrompt.Core.Models;
 using OneShotPrompt.Infrastructure.Providers;
@@ -41,15 +42,75 @@ public sealed class AgentFactoryReflectionTests
         await Assert.ThrowsAsync<OperationCanceledException>(() => new AgentFactory().CreateAsync(config, job, AppContext.BaseDirectory, source.Token));
     }
 
-    [Theory]
-    [InlineData(JobProvider.OpenAI)]
-    [InlineData(JobProvider.OpenAICompatible)]
-    [InlineData(JobProvider.Anthropic)]
-    public void CreateChatClient_ReturnsClientForSupportedProviders(JobProvider provider)
+    [Fact]
+    public void CreateChatClient_ReturnsClientForOpenAI()
     {
-        var client = ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "CreateChatClient", CreateConfig(), provider);
+        Assert.NotNull(ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "CreateChatClient", CreateConfig(), JobProvider.OpenAI));
+    }
 
-        Assert.NotNull(client);
+    [Fact]
+    public void CreateChatClient_ReturnsClientForOpenAICompatible()
+    {
+        Assert.NotNull(ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "CreateChatClient", CreateConfig(), JobProvider.OpenAICompatible));
+    }
+
+    [Fact]
+    public void CreateChatClient_ReturnsClientForAnthropic()
+    {
+        Assert.NotNull(ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "CreateChatClient", CreateConfig(), JobProvider.Anthropic));
+    }
+
+    [Fact]
+    public void CreateGitHubCopilotClientOptions_MapsProviderSettings()
+    {
+        var settings = new GitHubCopilotProviderSettings
+        {
+            Model = "gpt-5",
+            CliPath = "C:/tools/copilot.exe",
+            LogLevel = "debug",
+            GitHubToken = "token",
+            UseLoggedInUser = false,
+            AutoStart = false,
+            AutoRestart = false,
+        };
+
+        var options = (CopilotClientOptions)ProcessTestHarness.InvokePrivateStatic(
+            typeof(AgentFactory),
+            "CreateGitHubCopilotClientOptions",
+            settings,
+            AppContext.BaseDirectory)!;
+
+        Assert.Equal("C:/tools/copilot.exe", options.CliPath);
+        Assert.Equal("debug", options.LogLevel);
+        Assert.Equal("token", options.GitHubToken);
+        Assert.False(options.UseLoggedInUser);
+        Assert.False(options.AutoStart);
+        Assert.False(options.AutoRestart);
+        Assert.Equal(AppContext.BaseDirectory, options.Cwd);
+    }
+
+    [Fact]
+    public async Task CreateGitHubCopilotSessionConfig_ProvidesDefaultPermissionHandler()
+    {
+        var settings = new GitHubCopilotProviderSettings
+        {
+            Model = "gpt-5",
+        };
+
+        var sessionConfig = (SessionConfig)ProcessTestHarness.InvokePrivateStatic(
+            typeof(AgentFactory),
+            "CreateGitHubCopilotSessionConfig",
+            settings,
+            new List<AIFunction>(),
+            "Follow the instructions.",
+            Path.Combine(TestPaths.GetSolutionRoot(), "src", "OneShotPrompt.Console"))!;
+
+        Assert.NotNull(sessionConfig.OnPermissionRequest);
+        Assert.Null(sessionConfig.ReasoningEffort);
+
+        var result = await sessionConfig.OnPermissionRequest!(null!, new PermissionInvocation());
+
+        Assert.Equal("denied-no-approval-rule-and-could-not-request-from-user", result.Kind);
     }
 
     [Fact]
@@ -172,6 +233,30 @@ public sealed class AgentFactoryReflectionTests
         Assert.Contains("Job: nightly", prompt);
         Assert.Contains("Task:", prompt);
         Assert.Contains("Available tools:", prompt);
+    }
+
+    [Fact]
+    public void BuildInstructionHelpers_SkipPromptLevelReasoningForGitHubCopilot()
+    {
+        var config = new AppConfig { ThinkingLevel = "high" };
+        var job = new JobDefinition
+        {
+            Name = "copilot",
+            Prompt = "Inspect the repo",
+            Provider = nameof(JobProvider.GitHubCopilot),
+            AutoApprove = false,
+        };
+
+        var availableTools = ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "BuildToolDefinitions", job, AppContext.BaseDirectory)!;
+        var instructions = (string)ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "BuildExecutionInstructions", config, job, 5, availableTools, Array.Empty<string>())!;
+        var selectorInstructions = (string)ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "BuildToolSelectionInstructions", config, job, 5)!;
+        var prompt = (string)ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "BuildToolSelectionPrompt", config, job, availableTools)!;
+
+        Assert.DoesNotContain("Requested reasoning level", instructions);
+        Assert.DoesNotContain("expand the plan through reasoning", instructions);
+        Assert.Contains("Keep tool use minimal before acting.", instructions);
+        Assert.DoesNotContain("Requested reasoning level", selectorInstructions);
+        Assert.DoesNotContain("Requested reasoning level", prompt);
     }
 
     [Fact]
@@ -325,6 +410,10 @@ public sealed class AgentFactoryReflectionTests
                 Endpoint = "http://localhost:1234/v1",
                 ApiKey = "compat-key",
                 Model = "compat-model",
+            },
+            GitHubCopilot =
+            {
+                Model = "gpt-5",
             },
         };
     }

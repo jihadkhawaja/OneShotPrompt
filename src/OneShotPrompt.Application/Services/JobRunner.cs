@@ -42,7 +42,7 @@ public sealed class JobRunner(
 
             try
             {
-                var preparedAgent = await agentFactory.CreateAsync(config, job, configDirectory, cancellationToken);
+                await using var preparedAgent = await agentFactory.CreateAsync(config, job, configDirectory, cancellationToken);
                 await WriteToolSelectionSummaryAsync(output, preparedAgent.ToolSelection);
 
                 var response = await preparedAgent.Agent.RunAsync(prompt, cancellationToken);
@@ -90,7 +90,7 @@ public sealed class JobRunner(
 
         try
         {
-            var preparedAgent = await agentFactory.CreateAsync(config, job, configDirectory, cancellationToken);
+            await using var preparedAgent = await agentFactory.CreateAsync(config, job, configDirectory, cancellationToken);
             await WriteToolSelectionSummaryAsync(output, preparedAgent.ToolSelection);
 
             var response = await preparedAgent.Agent.RunAsync(prompt, cancellationToken);
