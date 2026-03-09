@@ -63,7 +63,10 @@ public sealed class AgentFactoryReflectionTests
     [Fact]
     public void CreateChatClient_ReturnsClientForGemini()
     {
-        Assert.NotNull(ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "CreateChatClient", CreateConfig(), JobProvider.Gemini));
+        var client = ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "CreateChatClient", CreateConfig(), JobProvider.Gemini);
+
+        Assert.NotNull(client);
+        Assert.Equal("GeminiDotnet.Extensions.AI.GeminiChatClient", client!.GetType().FullName);
     }
 
     [Fact]

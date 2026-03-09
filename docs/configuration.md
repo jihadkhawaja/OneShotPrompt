@@ -19,6 +19,8 @@ OneShotPrompt reads a single YAML file and validates it before any job runs. Sta
 - `ApiKey`: API key used when a job sets `Provider: "Gemini"`.
 - `Model`: Gemini model name. The default sample uses `gemini-2.5-flash`.
 
+Gemini jobs are backed by `GeminiDotnet.Extensions.AI`, so they continue to use the same `Microsoft.Extensions.AI` and Microsoft Agent Framework execution path as the other chat-backed providers while remaining compatible with Native AOT publishing.
+
 ### `OpenAICompatible`
 
 - `Endpoint`: Base endpoint for an OpenAI-compatible server.
