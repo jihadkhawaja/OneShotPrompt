@@ -1,6 +1,6 @@
 # Configuration Guide
 
-OneShotPrompt reads a single YAML file and validates it before any job runs. Start with `config.yaml.example`, copy it to `config.yaml`, and then fill in only the provider settings you actually use.
+OneShotPrompt reads a single YAML file and validates it before any job runs. Start with `config.example.yaml`, copy it to `config.yaml`, and then fill in only the provider settings you actually use.
 
 ## Root Settings
 
@@ -94,7 +94,7 @@ The application rejects a config when any of these are true:
 - `ThinkingLevel` is not `low`, `medium`, or `high`.
 - The file contains unsupported YAML sections or properties.
 
-The YAML reader is intentionally minimal. Keep the file simple and close to the structure in [config.yaml.example](../config.yaml.example).
+The YAML reader is intentionally minimal. Keep the file simple and close to the structure in [config.example.yaml](../config.example.yaml).
 
 ## Example
 
@@ -102,6 +102,10 @@ The YAML reader is intentionally minimal. Keep the file simple and close to the 
 OpenAI:
   ApiKey: ""
   Model: "gpt-5-nano"
+
+Anthropic:
+  ApiKey: ""
+  Model: "claude-haiku-4-5"
 
 ThinkingLevel: "low"
 PersistMemory: true

@@ -33,7 +33,7 @@ flowchart LR
 
 ## Quick Start
 
-1. Copy `config.yaml.example` to `config.yaml`.
+1. Copy `config.example.yaml` to `config.yaml`.
 2. Fill in the provider settings you need and add at least one job.
 3. Validate the config.
 4. List jobs or run one.

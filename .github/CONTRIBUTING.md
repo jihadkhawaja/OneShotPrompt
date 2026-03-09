@@ -43,7 +43,7 @@ skills, update the related documentation in `README.md` or `docs/`.
 ## Configuration and Safety
 
 - Do not commit real API keys, tokens, or private configuration.
-- Use `config.yaml.example` as the starting point for examples.
+- Use `config.example.yaml` as the starting point for examples.
 - Prefer examples that are safe to run in a local test workspace.
 
 ## Pull Request Guidelines

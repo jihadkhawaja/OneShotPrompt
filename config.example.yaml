@@ -30,7 +30,7 @@ Jobs:
 
   - Name: "repo-build-check"
     Prompt: "Build the repository next to this config file with dotnet and summarize any failures."
-    Provider: "OpenAI"
+    Provider: "Anthropic"
     AutoApprove: true
     AllowedTools: "RunDotNetCommand, ReadTextFile, ListDirectory"
     PersistMemory: false

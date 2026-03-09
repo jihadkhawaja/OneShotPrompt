@@ -27,7 +27,7 @@
 - Keep changes focused and avoid introducing abstractions unless they isolate a real variability point such as providers, persistence, or tool surfaces.
 - When behavior changes, update or add xUnit coverage in `tests/OneShotPrompt.Tests`.
 - If you change CLI behavior, configuration shape or validation, scheduling behavior, or bundled skills under `src/OneShotPrompt.Console/skills`, update the relevant docs in `README.md`, `docs/`, or `.github/CONTRIBUTING.md`.
-- Use `config.yaml.example` as the source for safe configuration examples; never commit real secrets.
+- Use `config.example.yaml` as the source for safe configuration examples; never commit real secrets.
 - Respect the safety model: `AutoApprove: false` means read-only execution, and mutation-capable examples or code paths should not bypass that boundary.
 
 ## Important Files
