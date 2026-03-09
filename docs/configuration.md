@@ -14,6 +14,11 @@ OneShotPrompt reads a single YAML file and validates it before any job runs. Sta
 - `ApiKey`: API key used when a job sets `Provider: "Anthropic"`.
 - `Model`: Model name. The default sample uses `claude-haiku-4-5`.
 
+### `Gemini`
+
+- `ApiKey`: API key used when a job sets `Provider: "Gemini"`.
+- `Model`: Gemini model name. The default sample uses `gemini-2.5-flash`.
+
 ### `OpenAICompatible`
 
 - `Endpoint`: Base endpoint for an OpenAI-compatible server.
@@ -51,7 +56,7 @@ Each entry under `Jobs:` supports the following properties:
 
 - `Name`: Required. Must be unique across the file.
 - `Prompt`: Required. The task given to the agent.
-- `Provider`: Required. Must be `OpenAI`, `Anthropic`, `OpenAICompatible`, or `GitHubCopilot`.
+- `Provider`: Required. Must be `OpenAI`, `Anthropic`, `Gemini`, `OpenAICompatible`, or `GitHubCopilot`.
 - `AutoApprove`: Optional. Defaults to `false`.
 - `AllowedTools`: Optional comma-separated tool allowlist applied before automatic tool selection.
 - `PersistMemory`: Optional job-level override for the root value.
@@ -121,6 +126,10 @@ OpenAI:
 Anthropic:
   ApiKey: ""
   Model: "claude-haiku-4-5"
+
+Gemini:
+  ApiKey: ""
+  Model: "gemini-2.5-flash"
 
 GitHubCopilot:
   Model: "gpt-5"

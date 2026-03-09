@@ -6,6 +6,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Google.GenAI" />
     <PackageReference Include="Microsoft.Agents.AI.Anthropic" />
     <PackageReference Include="Microsoft.Agents.AI.GitHub.Copilot" />
     <PackageReference Include="Microsoft.Agents.AI.OpenAI" />

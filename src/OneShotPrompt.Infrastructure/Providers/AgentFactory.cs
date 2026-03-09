@@ -2,6 +2,7 @@ using System.ClientModel;
 using System.Text;
 using Anthropic;
 using GitHub.Copilot.SDK;
+using Google.GenAI;
 using Microsoft.Agents.AI;
 using Microsoft.Agents.AI.GitHub.Copilot;
 using Microsoft.Extensions.AI;
@@ -66,6 +67,8 @@ public sealed class AgentFactory(IJobEventSink? eventSink = null) : IJobAgentFac
             JobProvider.OpenAI => new OpenAIClient(config.OpenAI.ApiKey)
                 .GetChatClient(config.OpenAI.Model)
                 .AsIChatClient(),
+            JobProvider.Gemini => new Client(apiKey: config.Gemini.ApiKey)
+                .AsIChatClient(config.Gemini.Model),
             JobProvider.OpenAICompatible => new ChatClient(
                 model: config.OpenAICompatible.Model,
                 credential: new ApiKeyCredential(config.OpenAICompatible.ApiKey),

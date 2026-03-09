@@ -49,6 +49,9 @@ public sealed class YamlConfigLoader : IAppConfigLoader
                     case "Anthropic":
                         ParseProviderSection(lines, ref index, 2, AssignAnthropic);
                         break;
+                    case "Gemini":
+                        ParseProviderSection(lines, ref index, 2, AssignGemini);
+                        break;
                     case "OpenAICompatible":
                         ParseProviderSection(lines, ref index, 2, AssignOpenAICompatible);
                         break;
@@ -104,6 +107,23 @@ public sealed class YamlConfigLoader : IAppConfigLoader
             }
 
             throw new InvalidOperationException($"Unsupported Anthropic setting '{key}'.");
+        }
+
+        void AssignGemini(string key, object value)
+        {
+            if (key.Equals("ApiKey", StringComparison.OrdinalIgnoreCase))
+            {
+                config.Gemini.ApiKey = ToStringValue(value);
+                return;
+            }
+
+            if (key.Equals("Model", StringComparison.OrdinalIgnoreCase))
+            {
+                config.Gemini.Model = ToStringValue(value);
+                return;
+            }
+
+            throw new InvalidOperationException($"Unsupported Gemini setting '{key}'.");
         }
 
         void AssignOpenAICompatible(string key, object value)
@@ -428,6 +448,10 @@ public sealed class YamlConfigLoader : IAppConfigLoader
             case JobProvider.Anthropic:
                 EnsureRequired(config.Anthropic.ApiKey, jobName, "Anthropic.ApiKey");
                 EnsureRequired(config.Anthropic.Model, jobName, "Anthropic.Model");
+                break;
+            case JobProvider.Gemini:
+                EnsureRequired(config.Gemini.ApiKey, jobName, "Gemini.ApiKey");
+                EnsureRequired(config.Gemini.Model, jobName, "Gemini.Model");
                 break;
             case JobProvider.OpenAICompatible:
                 EnsureRequired(config.OpenAICompatible.Endpoint, jobName, "OpenAICompatible.Endpoint");

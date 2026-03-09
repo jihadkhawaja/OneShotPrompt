@@ -19,6 +19,9 @@ public sealed class YamlConfigLoaderTests
             Anthropic:
               ApiKey: anthropic-key
               Model: claude-test
+            Gemini:
+              ApiKey: gemini-key
+              Model: gemini-2.5-flash
             OpenAICompatible:
               Endpoint: http://localhost:1234/v1
               ApiKey: compat-key
@@ -47,6 +50,8 @@ public sealed class YamlConfigLoaderTests
         Assert.False(config.PersistMemory);
         Assert.Equal("openai-key", config.OpenAI.ApiKey);
         Assert.Equal("claude-test", config.Anthropic.Model);
+        Assert.Equal("gemini-key", config.Gemini.ApiKey);
+        Assert.Equal("gemini-2.5-flash", config.Gemini.Model);
         Assert.Equal("http://localhost:1234/v1", config.OpenAICompatible.Endpoint);
         Assert.Equal("gpt-5", config.GitHubCopilot.Model);
         Assert.Equal("C:/tools/copilot.exe", config.GitHubCopilot.CliPath);
@@ -254,6 +259,18 @@ public sealed class YamlConfigLoaderTests
             """);
 
         Assert.Equal("Job 'Daily' requires 'OpenAICompatible.Endpoint' to be configured.", compatible.Message);
+
+        var gemini = await LoadInvalidConfigAsync("""
+            Gemini:
+              ApiKey: key
+              Model: 
+            Jobs:
+              - Name: Daily
+                Prompt: first
+                Provider: Gemini
+            """);
+
+        Assert.Equal("Job 'Daily' requires 'Gemini.Model' to be configured.", gemini.Message);
     }
 
     [Fact]

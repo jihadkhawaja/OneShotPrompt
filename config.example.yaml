@@ -6,6 +6,10 @@ Anthropic:
   ApiKey: ""
   Model: "claude-haiku-4-5"
 
+Gemini:
+  ApiKey: ""
+  Model: "gemini-2.5-flash"
+
 OpenAICompatible:
   Endpoint: "http://localhost:1234/v1"
   ApiKey: "lm-studio"
@@ -44,6 +48,15 @@ Jobs:
     Provider: "Anthropic"
     AutoApprove: true
     AllowedTools: "RunDotNetCommand, ReadTextFile, ListDirectory"
+    PersistMemory: false
+    ThinkingLevel: "medium"
+    Enabled: false
+
+  - Name: "gemini-repo-summary"
+    Prompt: "Inspect the repository next to this config file and summarize the main architecture and any obvious risks without making changes."
+    Provider: "Gemini"
+    AutoApprove: false
+    AllowedTools: "ListDirectory, ReadTextFile, ReadTextFileLines, GetTextFileLength"
     PersistMemory: false
     ThinkingLevel: "medium"
     Enabled: false

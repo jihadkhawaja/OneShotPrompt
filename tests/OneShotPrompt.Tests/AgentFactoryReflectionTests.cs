@@ -61,6 +61,12 @@ public sealed class AgentFactoryReflectionTests
     }
 
     [Fact]
+    public void CreateChatClient_ReturnsClientForGemini()
+    {
+        Assert.NotNull(ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "CreateChatClient", CreateConfig(), JobProvider.Gemini));
+    }
+
+    [Fact]
     public void CreateGitHubCopilotClientOptions_MapsProviderSettings()
     {
         var settings = new GitHubCopilotProviderSettings
@@ -404,6 +410,11 @@ public sealed class AgentFactoryReflectionTests
             {
                 ApiKey = "key",
                 Model = "claude-test",
+            },
+            Gemini =
+            {
+                ApiKey = "key",
+                Model = "gemini-2.5-flash",
             },
             OpenAICompatible =
             {

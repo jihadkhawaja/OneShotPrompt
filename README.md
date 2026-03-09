@@ -2,7 +2,7 @@
 
 OneShotPrompt is a .NET 10 console application for running one-shot AI jobs from YAML configuration.
 
-It uses Microsoft Agent Framework for agent execution, supports OpenAI, Anthropic, OpenAI-compatible endpoints, and GitHub Copilot, persists lightweight job memory when enabled, and is configured for Native AOT publishing by default.
+It uses Microsoft Agent Framework for agent execution, supports OpenAI, Anthropic, Gemini, OpenAI-compatible endpoints, and GitHub Copilot, persists lightweight job memory when enabled, and is configured for Native AOT publishing by default.
 
 ## What It Does
 
@@ -25,7 +25,7 @@ flowchart LR
   Selector --> Agent["Execution agent"]
   Agent --> Tools["Filesystem + process tools"]
   Agent --> Memory["Per-job memory"]
-  Agent --> Providers["OpenAI / Anthropic / Compatible APIs / GitHub Copilot"]
+  Agent --> Providers["OpenAI / Anthropic / Gemini / Compatible APIs / GitHub Copilot"]
   Agent --> Events["Job events"]
   Events --> Terminal["Spectre.Console live view"]
   Events --> Logs["logs/*.log"]
@@ -109,6 +109,7 @@ Every `run` command writes a timestamped log file to `logs/` next to the active 
 - `MoveFiles` moves multiple files in parallel for faster batch operations.
 - `interactive` and `-i` open the Spectre.Console menu explicitly.
 - `AllowedTools` can further restrict the tool catalog before selection.
+- `Gemini` jobs run through Google's `Google.GenAI` SDK via its `IChatClient` adapter, then flow through the same Microsoft Agent Framework execution path as the other chat-client-backed providers.
 - `GitHubCopilot` jobs keep Copilot CLI shell, file, and URL permissions disabled; local actions still flow through the selected built-in OneShotPrompt tools.
 - Custom skills can be placed in a `skills/` directory next to the active config file.
 - Job memory is stored in `.oneshotprompt/memory/` next to the active config file.

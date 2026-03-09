@@ -8,6 +8,8 @@ public sealed class AppConfig
 
     public AnthropicProviderSettings Anthropic { get; } = new();
 
+    public GeminiProviderSettings Gemini { get; } = new();
+
     public OpenAICompatibleProviderSettings OpenAICompatible { get; } = new();
 
     public GitHubCopilotProviderSettings GitHubCopilot { get; } = new();
@@ -31,6 +33,13 @@ public sealed class AnthropicProviderSettings
     public string ApiKey { get; set; } = string.Empty;
 
     public string Model { get; set; } = "claude-haiku-4-5";
+}
+
+public sealed class GeminiProviderSettings
+{
+    public string ApiKey { get; set; } = string.Empty;
+
+    public string Model { get; set; } = "gemini-2.5-flash";
 }
 
 public sealed class OpenAICompatibleProviderSettings
