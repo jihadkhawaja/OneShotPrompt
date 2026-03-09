@@ -5,6 +5,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <TrimmerRootAssembly Include="Google.GenAI" />
+    <TrimmerRootAssembly Include="Google.Apis.Core" />
+    <TrimmerRootAssembly Include="Newtonsoft.Json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\OneShotPrompt.Application\OneShotPrompt.Application.csproj" />
     <ProjectReference Include="..\OneShotPrompt.Infrastructure\OneShotPrompt.Infrastructure.csproj" />
   </ItemGroup>
@@ -23,7 +29,7 @@
     <Nullable>enable</Nullable>
     <PublishAot>true</PublishAot>
     <PublishTrimmed>true</PublishTrimmed>
-    <TrimMode>full</TrimMode>
+    <TrimMode>partial</TrimMode>
     <InvariantGlobalization>true</InvariantGlobalization>
     <StripSymbols>true</StripSymbols>
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
