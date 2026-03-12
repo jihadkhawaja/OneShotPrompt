@@ -1,64 +1,81 @@
 # Operations Guide
 
-This project is designed around a small CLI surface. The operational workflow is:
+This guide is for running OneShotPrompt reliably in day-to-day use, whether you are invoking it manually, using the interactive console, or preparing it for scheduled execution.
+
+For command syntax, see [cli-reference.md](./cli-reference.md). For config shape, see [configuration.md](./configuration.md).
+
+## Standard Workflow
+
+Use this sequence when introducing a new config or changing an existing one:
 
 1. Validate the config.
-2. List jobs.
-3. Run all jobs or one named job.
-4. Use the interactive console when you want ad-hoc prompting or menu-driven execution.
-5. Publish a Native AOT binary if you want scheduled execution without `dotnet run`.
+2. List jobs to confirm names and enabled state.
+3. Run one job explicitly if you are testing a change.
+4. Run all enabled jobs only when the config is stable.
+5. Publish a Native AOT build before wiring the app into an operating-system scheduler.
 
-## CLI Commands
-
-### Validate
+## Validate First
 
 ```powershell
 dotnet run --project src/OneShotPrompt.Console -- validate --config config.yaml
 ```
 
-PowerShell helper:
+Or use the helper script:
 
 ```powershell
 ./scripts/validate-config.ps1 -ConfigPath ./config.yaml
 ```
 
-### List Jobs
+Successful validation prints the number of jobs loaded from the file.
+
+## Confirm Job Names
 
 ```powershell
 dotnet run --project src/OneShotPrompt.Console -- jobs --config config.yaml
 ```
 
-PowerShell helper:
+Or:
 
 ```powershell
 ./scripts/list-jobs.ps1 -ConfigPath ./config.yaml
 ```
 
-### Run All Enabled Jobs
+Output format:
+
+```text
+- downloads-cleanup | Provider=OpenAI | Enabled=True | Schedule=Daily at midnight
+```
+
+This is the safest way to confirm the exact `--job` name before automating anything.
+
+## Run Jobs
+
+Run all enabled jobs:
 
 ```powershell
 dotnet run --project src/OneShotPrompt.Console -- run --config config.yaml
 ```
 
-PowerShell helper:
-
-```powershell
-./scripts/run-job.ps1 -ConfigPath ./config.yaml
-```
-
-### Run One Job
+Run one named job:
 
 ```powershell
 dotnet run --project src/OneShotPrompt.Console -- run --config config.yaml --job downloads-cleanup
 ```
 
-PowerShell helper:
+Helper script for either form:
 
 ```powershell
+./scripts/run-job.ps1 -ConfigPath ./config.yaml
 ./scripts/run-job.ps1 -ConfigPath ./config.yaml -JobName downloads-cleanup
 ```
 
-### Interactive Console
+If a named job is missing or disabled, the command returns a non-zero exit code.
+
+If multiple jobs are selected, execution continues through the set and returns non-zero if any selected job fails.
+
+## Interactive Console
+
+Start the menu explicitly:
 
 ```powershell
 dotnet run --project src/OneShotPrompt.Console -- interactive
@@ -70,43 +87,46 @@ Short alias:
 dotnet run --project src/OneShotPrompt.Console -- -i
 ```
 
-If you launch the app with no arguments from an interactive terminal, it opens the same menu automatically. In redirected or scheduled contexts, use explicit commands such as `run --config ...` instead of relying on no-argument behavior.
+Behavior details:
 
-The interactive console can:
+- No arguments in an interactive terminal open the same menu automatically.
+- No arguments in redirected or scheduled contexts do not open the menu; those flows should use explicit commands.
+- The menu prompts for a config path first and then offers these actions:
+  - Run direct prompt
+  - Run all jobs
+  - Run specific job
+  - Validate
+  - List jobs
+  - Clear memories
+  - Exit
 
-- Run a direct ad-hoc prompt against a selected provider.
-- Run all enabled jobs.
-- Run one selected job.
-- Validate the config.
-- List jobs.
-- Clear persisted memory files under `.oneshotprompt/memory/`.
+`Run direct prompt` lets you choose a provider, decide whether mutation tools are allowed, and then enter prompts repeatedly until you submit an empty prompt.
 
-## What The App Prints
+`Clear memories` deletes all `*.json` files under `.oneshotprompt/memory/` next to the active config file after confirmation.
 
-During a run, the console prints the selected job name, selector telemetry, the model response, and any per-job failure message.
+## Console Output And Logs
 
-When standard output is attached to an interactive terminal, OneShotPrompt also streams live job events through Spectre.Console, including reasoning text, tool calls, and tool results.
+During job execution, OneShotPrompt writes:
 
-Selector telemetry includes:
+- The job or ad-hoc prompt header.
+- Tool-selection telemetry.
+- The model response.
+- Failure messages when exceptions occur.
 
-- Total tools available before any allowlist is applied.
+When the app is attached to an interactive terminal, it also streams live job events through Spectre.Console, including reasoning, tool calls, and tool results.
+
+Tool-selection telemetry includes:
+
+- Total tools available before any allowlist filtering.
 - Tools eligible after allowlist filtering.
-- The configured allowlist, when present.
-- Whether the selector pass actually ran.
-- The final selected tool names.
+- The configured allowlist, when one exists.
+- Whether the selector was used.
+- The final selected tool set.
 - Any selector rationale returned by the model.
 
-Validation prints the job count when the file is valid.
+Every `run` invocation writes a timestamped log file under `logs/` next to the active config file. Interactive direct prompts write to the same location.
 
-Job listing prints one line per job in this format:
-
-```text
-- downloads-cleanup | Provider=OpenAI | Enabled=True | Schedule=Daily at midnight
-```
-
-Every `run` invocation writes a timestamped log file under `logs/` next to the active config file. Interactive direct prompts write logs there as well.
-
-## Memory Files
+## Memory Behavior
 
 When memory persistence is enabled, each job stores a compact JSON history under:
 
@@ -114,73 +134,63 @@ When memory persistence is enabled, each job stores a compact JSON history under
 .oneshotprompt/memory/
 ```
 
-Behavior details:
+Operationally important details:
 
-- Memory lives next to the active config file, not next to the repository root unless the config is there.
+- Memory is scoped to the config directory, not to the repository root unless the config lives there.
 - Each job keeps up to 10 entries.
-- Job names are sanitized before becoming filenames.
-- The interactive `Clear memories` action deletes all `*.json` files in that directory.
+- Stored entries include timestamp, prompt, and response.
+- The interactive menu can clear all persisted memory files in one step.
 
-## Publishing
+If you do not want persisted context between runs, set `PersistMemory: false` globally or per job.
 
-The console project is configured for Native AOT. Publish with either of these:
+## Publish For Scheduled Runs
+
+The console app is set up for Native AOT publishing.
+
+Direct publish:
 
 ```powershell
 dotnet publish src/OneShotPrompt.Console/OneShotPrompt.Console.csproj -c Release -r win-arm64
 ```
 
+Helper script:
+
 ```powershell
 ./scripts/publish-aot.ps1 -RuntimeIdentifier win-arm64
 ```
 
-The default publish output path is:
+Supported runtime identifiers in the helper script:
+
+- `win-x64`
+- `win-arm64`
+- `linux-x64`
+- `linux-arm64`
+- `osx-x64`
+- `osx-arm64`
+
+Typical output path:
 
 ```text
 src/OneShotPrompt.Console/bin/Release/net10.0/<rid>/publish/
 ```
 
-Supported runtime identifiers in the helper script are:
+Before registering a scheduler entry, run the published binary manually once with explicit arguments.
+
+## Scheduled Execution
+
+OneShotPrompt does not contain an internal scheduler.
+
+- Windows: use Task Scheduler. See [windows-task-scheduler.md](./windows-task-scheduler.md).
+- Linux: use `cron` or `systemd`. See [linux-scheduling.md](./linux-scheduling.md).
+
+For unattended runs, prefer the explicit form below over relying on default behavior:
 
 ```text
-win-x64
-win-arm64
-linux-x64
-linux-arm64
-osx-x64
-osx-arm64
+run --config <path> --job <name>
 ```
 
-## GitHub Releases
+## Release Packaging
 
 The repository includes a manual GitHub Actions workflow named `Publish Release`.
 
-Run it from the Actions tab and provide `release_version` as the exact tag you want to publish. Example: entering `1.0` creates or updates a release tagged `1.0`, marks it as the latest release, and attaches zipped Native AOT publish outputs for each supported platform.
-
-## Windows Scheduling
-
-For unattended Windows runs, publish first and then register a scheduled task against the produced executable.
-
-Example:
-
-```powershell
-./scripts/register-daily-task.ps1 `
-  -TaskName OneShotPrompt-DownloadsCleanup `
-  -ExecutablePath ./src/OneShotPrompt.Console/bin/Release/net10.0/win-arm64/publish/OneShotPrompt.Console.exe `
-  -ConfigPath ./config.yaml `
-  -JobName downloads-cleanup `
-  -Time 00:00
-```
-
-More detail is in [windows-task-scheduler.md](./windows-task-scheduler.md).
-
-## Linux Scheduling
-
-For unattended Linux runs, publish first and then use either `cron` or a `systemd` timer against the produced binary.
-
-Simple `cron` example:
-
-```cron
-0 0 * * * /opt/oneshotprompt/OneShotPrompt.Console run --config /etc/oneshotprompt/config.yaml --job downloads-cleanup
-```
-
-More detail is in [linux-scheduling.md](./linux-scheduling.md).
+Provide `release_version` as the exact tag to publish. The workflow creates or updates the corresponding release and attaches zipped Native AOT publish outputs for the supported platforms.

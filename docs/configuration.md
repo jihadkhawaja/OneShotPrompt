@@ -1,83 +1,141 @@
 # Configuration Guide
 
-OneShotPrompt reads a single YAML file and validates it before any job runs. Start with `config.example.yaml`, copy it to `config.yaml`, and then fill in only the provider settings you actually use.
+OneShotPrompt reads one YAML file, validates it before any execution, and treats the directory containing that file as the runtime root for related state.
 
-## Root Settings
+That matters because these paths are resolved relative to the active config file:
 
-### `OpenAI`
+- `logs/`
+- `skills/`
+- `.oneshotprompt/memory/`
 
-- `ApiKey`: API key used when a job sets `Provider: "OpenAI"`.
-- `Model`: Chat model name. The default sample uses `gpt-5-nano`.
+Start from [config.example.yaml](../config.example.yaml), keep the structure close to that file, and prefer explicit values over YAML tricks. The parser is intentionally small and rejects unsupported sections or properties.
 
-### `Anthropic`
+## Runtime Model
 
-- `ApiKey`: API key used when a job sets `Provider: "Anthropic"`.
-- `Model`: Model name. The default sample uses `claude-haiku-4-5`.
+One config file contains:
 
-### `Gemini`
+- Provider settings at the top level.
+- Optional global defaults such as `ThinkingLevel` and `PersistMemory`.
+- A `Jobs:` collection that defines runnable jobs.
 
-- `ApiKey`: API key used when a job sets `Provider: "Gemini"`.
-- `Model`: Gemini model name. The default sample uses `gemini-2.5-flash`.
+Each job chooses one provider, one prompt, and an execution policy. At runtime, OneShotPrompt narrows the tool catalog first, then runs the execution agent with only the selected subset.
 
-Gemini jobs are backed by `GeminiDotnet.Extensions.AI`, so they continue to use the same `Microsoft.Extensions.AI` and Microsoft Agent Framework execution path as the other chat-backed providers while remaining compatible with Native AOT publishing.
+## Supported Top-Level Sections
 
-### `OpenAICompatible`
+These top-level sections are recognized:
 
-- `Endpoint`: Base endpoint for an OpenAI-compatible server.
-- `ApiKey`: API key or local token for that endpoint.
-- `Model`: Model name exposed by that endpoint.
+- `OpenAI`
+- `Anthropic`
+- `Gemini`
+- `OpenAICompatible`
+- `GitHubCopilot`
+- `ThinkingLevel`
+- `PersistMemory`
+- `Jobs`
 
-### `GitHubCopilot`
+Any other top-level section fails validation.
 
-- `Model`: Default model name for jobs that set `Provider: "GitHubCopilot"`. Leave it blank to let the CLI choose its default.
-- `CliPath`: Optional explicit path to the GitHub Copilot CLI executable.
-- `CliUrl`: Optional URL for an already running Copilot CLI server. This is mutually exclusive with `CliPath`.
-- `LogLevel`: Optional Copilot CLI log level. The default is `info`.
-- `GitHubToken`: Optional explicit GitHub token for Copilot CLI auth.
-- `UseLoggedInUser`: Optional auth override. When omitted, the SDK defaults to the logged-in user unless `GitHubToken` is set.
-- `AutoStart`: Optional. Defaults to `true`.
-- `AutoRestart`: Optional. Defaults to `true`.
+## Provider Settings
 
-GitHub Copilot jobs require the GitHub Copilot CLI to be installed and authenticated. This runtime keeps Copilot's built-in shell, file, and URL permissions disabled and continues to expose only the selected OneShotPrompt tools for local mutation and inspection.
+Only configure the providers you actually use, but any provider referenced by a job must have its required settings populated.
+
+### OpenAI
+
+- `ApiKey`: required for `Provider: "OpenAI"` jobs.
+- `Model`: required for `Provider: "OpenAI"` jobs.
+
+Default model in the sample config: `gpt-5-nano`
+
+### Anthropic
+
+- `ApiKey`: required for `Provider: "Anthropic"` jobs.
+- `Model`: required for `Provider: "Anthropic"` jobs.
+
+Default model in the sample config: `claude-haiku-4-5`
+
+### Gemini
+
+- `ApiKey`: required for `Provider: "Gemini"` jobs.
+- `Model`: required for `Provider: "Gemini"` jobs.
+
+Default model in the sample config: `gemini-2.5-flash`
+
+Gemini runs through `GeminiDotnet.Extensions.AI`, but still follows the same Microsoft Agent Framework execution path as the other chat-client-backed providers.
+
+### OpenAICompatible
+
+- `Endpoint`: required for `Provider: "OpenAICompatible"` jobs.
+- `ApiKey`: required for `Provider: "OpenAICompatible"` jobs.
+- `Model`: required for `Provider: "OpenAICompatible"` jobs.
+
+This is intended for OpenAI-style local or hosted endpoints such as LM Studio-compatible servers.
+
+### GitHubCopilot
+
+- `Model`: optional default model for `Provider: "GitHubCopilot"` jobs.
+- `CliPath`: optional explicit path to the GitHub Copilot CLI executable.
+- `CliUrl`: optional URL for an already running Copilot CLI server.
+- `LogLevel`: optional Copilot CLI log level. Default: `info`.
+- `GitHubToken`: optional explicit token for Copilot CLI authentication.
+- `UseLoggedInUser`: optional boolean auth override.
+- `AutoStart`: optional. Default: `true`.
+- `AutoRestart`: optional. Default: `true`.
+
+Rules enforced by validation:
+
+- `CliUrl` and `CliPath` cannot both be set.
+- `CliUrl` cannot be combined with `GitHubToken`.
+- `CliUrl` cannot be combined with `UseLoggedInUser`.
+
+GitHub Copilot jobs require the GitHub Copilot CLI to be installed and authenticated. The runtime disables Copilot's built-in shell, file, and URL permissions and keeps local access scoped to OneShotPrompt's selected built-in tools.
+
+## Global Defaults
 
 ### `ThinkingLevel`
 
-Allowed values are `low`, `medium`, or `high`.
+Allowed values:
 
-This is the global default reasoning hint. A job can override it with its own `ThinkingLevel` value.
+- `low`
+- `medium`
+- `high`
+
+This value becomes the default reasoning hint for all jobs unless a job overrides it.
 
 ### `PersistMemory`
 
-When `true`, a job keeps a small rolling memory of prior prompt and response pairs unless the job explicitly overrides it.
+When `true`, jobs keep a compact rolling history of prompt and response pairs unless a job overrides the setting.
 
-Memory files are written next to the active config file under `.oneshotprompt/memory/`.
+Persisted memory lives under `.oneshotprompt/memory/` next to the active config file.
 
-## Job Settings
+## Job Schema
 
-Each entry under `Jobs:` supports the following properties:
+Each entry under `Jobs:` supports these properties:
 
-- `Name`: Required. Must be unique across the file.
-- `Prompt`: Required. The task given to the agent.
-- `Provider`: Required. Must be `OpenAI`, `Anthropic`, `Gemini`, `OpenAICompatible`, or `GitHubCopilot`.
-- `AutoApprove`: Optional. Defaults to `false`.
-- `AllowedTools`: Optional comma-separated tool allowlist applied before automatic tool selection.
-- `PersistMemory`: Optional job-level override for the root value.
-- `ThinkingLevel`: Optional job-level override for the root value.
-- `Schedule`: Optional metadata for humans and deployment scripts.
-- `Enabled`: Optional. Defaults to `true`.
+- `Name`: required, unique across the file.
+- `Prompt`: required.
+- `Provider`: required. Must be `OpenAI`, `Anthropic`, `Gemini`, `OpenAICompatible`, or `GitHubCopilot`.
+- `AutoApprove`: optional. Default: `false`.
+- `AllowedTools`: optional tool allowlist.
+- `PersistMemory`: optional job-level override for the global setting.
+- `ThinkingLevel`: optional job-level override for the global setting.
+- `Schedule`: optional human-readable schedule metadata.
+- `Enabled`: optional. Default: `true`.
+
+`Schedule` is descriptive only. OneShotPrompt does not schedule jobs itself.
 
 ## Tool Access Model
 
-`AutoApprove` controls whether a job can mutate the local environment.
+`AutoApprove` is the main safety boundary.
 
-- `false`: the agent can inspect files and directories only.
-- `true`: the agent can also create directories, move files, copy files, delete files, write files, and run built-in process execution tools.
+- `false`: inspection-only execution.
+- `true`: inspection plus mutation and process tools.
 
-`AllowedTools` is an additional restriction layer. When present, it filters the registered tool catalog before the selector agent runs.
+`AllowedTools` is an extra restriction layer applied before the selector runs. If it is omitted, the full built-in catalog is eligible. If it is present, only the named tools can be considered.
 
-- Use a comma-separated list such as `GetKnownFolder, ListDirectory, ReadTextFile`.
-- Unknown tool names are rejected during config validation.
-- Mutation tools in `AllowedTools` require `AutoApprove: true`.
+Accepted formats:
+
+- Comma-separated string: `GetKnownFolder, ListDirectory, ReadTextFile`
+- Single-line bracketed list: `[GetKnownFolder, ListDirectory, ReadTextFile]`
 
 Current built-in tools:
 
@@ -85,38 +143,43 @@ Current built-in tools:
 - File mutation: `CreateDirectory`, `MoveFile`, `MoveFiles`, `CopyFile`, `DeleteFile`, `WriteTextFile`
 - Process execution: `RunCommand`, `RunDotNetCommand`
 
-`MoveFiles` accepts pipe-delimited source and destination path strings and moves files concurrently. Prefer it over repeated `MoveFile` calls when organizing many files.
+Validation rules for `AllowedTools`:
 
-This is the main safety boundary in the current design. Use `false` for planning or audit-style jobs and `true` only for deterministic automation you trust.
+- Unknown tool names are rejected.
+- Duplicate tool names are rejected.
+- Mutation tools are rejected when `AutoApprove: false`.
 
-## Agent Skills
+`MoveFiles` is the batch-oriented file mover and is preferred over repeated `MoveFile` calls when a job is organizing many files.
 
-OneShotPrompt automatically exposes Agent Skills from two locations:
+## Skills
+
+OneShotPrompt exposes Agent Skills from two locations:
 
 - Bundled skills shipped with the console app.
-- A `skills/` directory next to the active config file.
+- A sibling `skills/` directory next to the active config file.
 
-Skills package instructions and references for the agent. They do not replace concrete file I/O or process execution in the current runtime, so local actions still happen through the built-in tools.
+Skills provide instructions and reference material. They do not replace the built-in filesystem or process tools.
 
-Bundled skills include a tool-selection optimizer plus CLI operating guidance for `validate`, `jobs`, `run`, and `interactive`. Before the main execution agent is created, OneShotPrompt runs a selector pass that uses the optimizer skill to choose the smallest relevant tool subset for the job. The execution agent then runs with only that selected subset, which keeps jobs more deterministic when many tools are registered.
+The runtime performs a tool-selection pass before the main execution agent runs. That pass uses the available skill context plus the registered tool catalog to choose the smallest relevant subset for the job.
 
-The bundled CLI guidance tells agents to prefer explicit subcommands, pass `--config` in scripted contexts, validate before running when config state is uncertain, list jobs before assuming a job name, and treat the active config directory as the runtime root for sibling `skills/`, `logs/`, and `.oneshotprompt/memory/` content.
+## Validation Behavior
 
-## Validation Rules
+Validation fails when any of these conditions is true:
 
-The application rejects a config when any of these are true:
-
-- No jobs are defined.
-- Two jobs use the same `Name`.
+- The config file does not define any jobs.
 - A job is missing `Name`.
 - A job is missing `Prompt`.
-- `Provider` is not one of the supported values.
-- `GitHubCopilot.CliUrl` and `GitHubCopilot.CliPath` are both set.
-- `GitHubCopilot.CliUrl` is combined with `GitHubCopilot.GitHubToken` or `GitHubCopilot.UseLoggedInUser`.
-- `ThinkingLevel` is not `low`, `medium`, or `high`.
-- The file contains unsupported YAML sections or properties.
+- Two jobs use the same `Name`.
+- A job references an unsupported provider.
+- A provider used by a job is missing required settings.
+- `ThinkingLevel` is not one of `low`, `medium`, or `high`.
+- `AllowedTools` contains duplicates.
+- `AllowedTools` contains unknown tool names.
+- `AllowedTools` includes mutation tools while `AutoApprove` is `false`.
+- `GitHubCopilot.CliUrl` conflicts with other GitHub Copilot connection settings.
+- The YAML file contains unsupported sections or unsupported properties inside known sections.
 
-The YAML reader is intentionally minimal. Keep the file simple and close to the structure in [config.example.yaml](../config.example.yaml).
+The parser is strict by design. Keep the file close to [config.example.yaml](../config.example.yaml) rather than relying on broader YAML features.
 
 ## Example
 
@@ -132,6 +195,11 @@ Anthropic:
 Gemini:
   ApiKey: ""
   Model: "gemini-2.5-flash"
+
+OpenAICompatible:
+  Endpoint: "http://localhost:1234/v1"
+  ApiKey: "lm-studio"
+  Model: "default"
 
 GitHubCopilot:
   Model: "gpt-5"
@@ -150,7 +218,7 @@ Jobs:
     Prompt: "Organize files in Downloads by type"
     Provider: "OpenAI"
     AutoApprove: true
-    AllowedTools: "GetKnownFolder, ListDirectory, MoveFile, MoveFiles, CreateDirectory"
+    AllowedTools: "GetKnownFolder, ListDirectory, MoveFiles, CreateDirectory"
     PersistMemory: false
     ThinkingLevel: "low"
     Schedule: "Daily at midnight"
@@ -158,8 +226,6 @@ Jobs:
 ```
 
 ## Validate Before Running
-
-Use either of these:
 
 ```powershell
 dotnet run --project src/OneShotPrompt.Console -- validate --config config.yaml
