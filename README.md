@@ -190,6 +190,7 @@ It is a weaker fit when you need:
 
 ## Documentation
 
+- [Use cases](docs/use-cases.md)
 - [Configuration guide](docs/configuration.md)
 - [CLI reference](docs/cli-reference.md)
 - [Operations guide](docs/operations.md)
