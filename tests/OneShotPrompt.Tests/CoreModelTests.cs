@@ -35,8 +35,17 @@ public sealed class CoreModelTests
 
         Assert.True(inherited.ResolvePersistMemory(config));
         Assert.Equal("medium", inherited.ResolveThinkingLevel(config));
+        Assert.Equal("single-agent", inherited.ResolveWorkflow());
+        Assert.False(inherited.UsesCorporatePlanning());
         Assert.False(overridden.ResolvePersistMemory(config));
         Assert.Equal("high", overridden.ResolveThinkingLevel(config));
+
+        var planningJob = new JobDefinition
+        {
+            Workflow = "corporate-planning",
+        };
+
+        Assert.True(planningJob.UsesCorporatePlanning());
     }
 
     [Fact]

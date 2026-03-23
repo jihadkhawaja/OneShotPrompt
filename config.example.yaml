@@ -26,6 +26,10 @@ GitHubCopilot:
   AutoStart: true
   AutoRestart: true
 
+CorporatePlanning:
+  MaxAgents: 4
+  MaxIterations: 8
+
 ThinkingLevel: "low"
 
 PersistMemory: true
@@ -36,6 +40,7 @@ Jobs:
   - Name: "downloads-cleanup"
     Prompt: "Organize files in Downloads by type"
     Provider: "OpenAI"
+    Workflow: "single-agent"
     AutoApprove: true
     AllowedTools: "GetKnownFolder, ListDirectory, MoveFile, MoveFiles, CreateDirectory"
     PersistMemory: false
@@ -43,9 +48,20 @@ Jobs:
     Schedule: "Daily at midnight"
     Enabled: true
 
+  - Name: "compatible-system-info"
+    Prompt: "Gather basic system information for this machine. Use available commands to report the OS, hostname, current user, current working directory, and installed .NET SDK/runtime details. Do not make changes."
+    Provider: "OpenAICompatible"
+    Workflow: "single-agent"
+    AutoApprove: true
+    AllowedTools: "RunCommand"
+    PersistMemory: false
+    ThinkingLevel: "low"
+    Enabled: false
+
   - Name: "repo-build-check"
     Prompt: "Build the repository next to this config file with dotnet and summarize any failures."
     Provider: "Anthropic"
+    Workflow: "corporate-planning"
     AutoApprove: true
     AllowedTools: "RunDotNetCommand, ReadTextFile, ListDirectory"
     PersistMemory: false
@@ -55,6 +71,7 @@ Jobs:
   - Name: "gemini-repo-summary"
     Prompt: "Inspect the repository next to this config file and summarize the main architecture and any obvious risks without making changes."
     Provider: "Gemini"
+    Workflow: "single-agent"
     AutoApprove: false
     AllowedTools: "ListDirectory, ReadTextFile, ReadTextFileLines, GetTextFileLength"
     PersistMemory: false
@@ -64,6 +81,7 @@ Jobs:
   - Name: "copilot-repo-audit"
     Prompt: "Inspect the repository next to this config file and summarize the highest-risk issues without making changes."
     Provider: "GitHubCopilot"
+    Workflow: "corporate-planning"
     AutoApprove: false
     AllowedTools: "ListDirectory, ReadTextFile, ReadTextFileLines, GetTextFileLength"
     PersistMemory: false

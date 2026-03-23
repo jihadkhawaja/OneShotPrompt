@@ -10,4 +10,8 @@ public sealed record ToolResultEvent(string ToolName, string Result) : JobEvent;
 
 public sealed record ResponseChunkEvent(string Text) : JobEvent;
 
+public sealed record GroupChatMessageEvent(string AgentName, string Text) : JobEvent;
+
+public sealed record OutputBoundaryEvent : JobEvent;
+
 public sealed record JobLogEvent(string Message) : JobEvent;

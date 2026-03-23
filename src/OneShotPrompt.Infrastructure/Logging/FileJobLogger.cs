@@ -27,6 +27,8 @@ public sealed class FileJobLogger : IJobEventSink, IAsyncDisposable
             ToolCallEvent tc => $"[{timestamp}] TOOL_CALL: {tc.ToolName} | {tc.Arguments}",
             ToolResultEvent tr => $"[{timestamp}] TOOL_RESULT: {tr.ToolName} | {Truncate(tr.Result, 2000)}",
             ResponseChunkEvent rc => $"[{timestamp}] RESPONSE_CHUNK: {Truncate(rc.Text, 2000)}",
+            GroupChatMessageEvent gc => $"[{timestamp}] GROUP_CHAT: {gc.AgentName} | {Truncate(gc.Text, 2000)}",
+            OutputBoundaryEvent => $"[{timestamp}] OUTPUT_BOUNDARY",
             JobLogEvent log => $"[{timestamp}] LOG: {log.Message}",
             _ => $"[{timestamp}] EVENT: {jobEvent}",
         };

@@ -13,7 +13,16 @@ public sealed class JobRunner(
 {
     public async Task<int> RunAsync(string configPath, string? jobName, TextWriter output, CancellationToken cancellationToken)
     {
-        var config = await configLoader.LoadAsync(configPath, cancellationToken);
+        var config = await configLoader.LoadAsync(
+            configPath,
+            cancellationToken,
+            new ConfigLoadOptions
+            {
+                ProviderValidationScope = string.IsNullOrWhiteSpace(jobName)
+                    ? ProviderValidationScope.EnabledJobs
+                    : ProviderValidationScope.SelectedJobs,
+                SelectedJobNames = string.IsNullOrWhiteSpace(jobName) ? [] : [jobName],
+            });
         var jobs = SelectJobs(config, jobName);
 
         if (jobs.Count == 0)
@@ -47,6 +56,7 @@ public sealed class JobRunner(
 
                 var response = await preparedAgent.Agent.RunAsync(prompt, cancellationToken);
 
+                eventSink?.Emit(new OutputBoundaryEvent());
                 await output.WriteLineAsync(response.Trim());
                 await output.WriteLineAsync(string.Empty);
                 eventSink?.Emit(new JobLogEvent($"Job completed: {job.Name}"));
@@ -72,6 +82,7 @@ public sealed class JobRunner(
             catch (Exception exception)
             {
                 hasFailures = true;
+                eventSink?.Emit(new OutputBoundaryEvent());
                 await output.WriteLineAsync($"Job '{job.Name}' failed: {exception.Message}");
                 await output.WriteLineAsync(string.Empty);
                 eventSink?.Emit(new JobLogEvent($"Job failed: {job.Name} -- {exception.Message}"));
@@ -95,6 +106,7 @@ public sealed class JobRunner(
 
             var response = await preparedAgent.Agent.RunAsync(prompt, cancellationToken);
 
+            eventSink?.Emit(new OutputBoundaryEvent());
             await output.WriteLineAsync(response.Trim());
             await output.WriteLineAsync(string.Empty);
             eventSink?.Emit(new JobLogEvent("Ad-hoc prompt completed"));
@@ -102,6 +114,7 @@ public sealed class JobRunner(
         }
         catch (Exception exception)
         {
+            eventSink?.Emit(new OutputBoundaryEvent());
             await output.WriteLineAsync($"Ad-hoc prompt failed: {exception.Message}");
             await output.WriteLineAsync(string.Empty);
             eventSink?.Emit(new JobLogEvent($"Ad-hoc prompt failed: {exception.Message}"));
@@ -111,14 +124,26 @@ public sealed class JobRunner(
 
     public async Task<int> ValidateAsync(string configPath, TextWriter output, CancellationToken cancellationToken)
     {
-        var config = await configLoader.LoadAsync(configPath, cancellationToken);
+        var config = await configLoader.LoadAsync(
+            configPath,
+            cancellationToken,
+            new ConfigLoadOptions
+            {
+                ProviderValidationScope = ProviderValidationScope.AllJobs,
+            });
         await output.WriteLineAsync($"Configuration is valid. Jobs: {config.Jobs.Count}.");
         return 0;
     }
 
     public async Task<int> ListJobsAsync(string configPath, TextWriter output, CancellationToken cancellationToken)
     {
-        var config = await configLoader.LoadAsync(configPath, cancellationToken);
+        var config = await configLoader.LoadAsync(
+            configPath,
+            cancellationToken,
+            new ConfigLoadOptions
+            {
+                ProviderValidationScope = ProviderValidationScope.None,
+            });
 
         foreach (var job in config.Jobs.OrderBy(job => job.Name, StringComparer.OrdinalIgnoreCase))
         {
@@ -145,6 +170,7 @@ public sealed class JobRunner(
         var builder = new StringBuilder();
         builder.AppendLine($"Job: {job.Name}");
         builder.AppendLine($"Provider: {job.Provider}");
+        builder.AppendLine($"Workflow: {job.ResolveWorkflow()}");
         builder.AppendLine($"Requested reasoning level: {NormalizeThinkingLevel(job.ResolveThinkingLevel(config))}");
         builder.AppendLine($"Mutation tools available: {(job.AutoApprove ? "yes" : "no")}");
         builder.AppendLine("Tool usage policy: shortlist the minimum relevant tools first, then use only that shortlist unless blocked.");
@@ -178,6 +204,7 @@ public sealed class JobRunner(
     {
         var builder = new StringBuilder();
         builder.AppendLine($"Provider: {job.Provider}");
+        builder.AppendLine($"Workflow: {job.ResolveWorkflow()}");
         builder.AppendLine($"Requested reasoning level: {NormalizeThinkingLevel(job.ResolveThinkingLevel(config))}");
         builder.AppendLine($"Mutation tools available: {(job.AutoApprove ? "yes" : "no")}");
         builder.AppendLine("Tool usage policy: shortlist the minimum relevant tools first, then use only that shortlist unless blocked.");
@@ -198,6 +225,7 @@ public sealed class JobRunner(
     {
         await output.WriteLineAsync($"  Tools available before allowlist: {summary.TotalAvailableTools}");
         await output.WriteLineAsync($"  Tools eligible for selection: {summary.EligibleTools}");
+        await output.WriteLineAsync($"  Workflow: {summary.Workflow}");
 
         if (summary.AllowedTools.Count > 0)
         {
@@ -210,6 +238,15 @@ public sealed class JobRunner(
         if (!string.IsNullOrWhiteSpace(summary.Rationale))
         {
             await output.WriteLineAsync($"  Selection rationale: {summary.Rationale}");
+        }
+
+        foreach (var generatedAgent in summary.GeneratedAgents)
+        {
+            var assignedTools = generatedAgent.AssignedTools.Count == 0
+                ? "none"
+                : string.Join(", ", generatedAgent.AssignedTools);
+            await output.WriteLineAsync($"  Generated agent: {generatedAgent.Name} | Tools={assignedTools}");
+            await output.WriteLineAsync($"    {generatedAgent.Description}");
         }
 
         await output.WriteLineAsync(string.Empty);

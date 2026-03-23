@@ -30,6 +30,44 @@ public sealed class JobRunnerTests
     }
 
     [Fact]
+    public async Task RunAsync_LoadsOnlySelectedJobProviderSettings_WhenJobNameIsSpecified()
+    {
+        var config = CreateConfig(
+            new JobDefinition { Name = "first", Prompt = "noop", Provider = "OpenAI", Enabled = true },
+            new JobDefinition { Name = "second", Prompt = "noop", Provider = "Anthropic", Enabled = true });
+        var loader = new FakeConfigLoader(config);
+        var runner = new JobRunner(
+            loader,
+            new FakeJobAgentFactory { PreparedAgent = new PreparedJobAgent(new FakeJobAgent("done"), new ToolSelectionSummary()) },
+            new FakeExecutionMemoryStore());
+
+        using var writer = new StringWriter();
+        await runner.RunAsync("config.yaml", "first", writer, CancellationToken.None);
+
+        Assert.NotNull(loader.LastOptions);
+        Assert.Equal(ProviderValidationScope.SelectedJobs, loader.LastOptions!.ProviderValidationScope);
+        Assert.Equal(["first"], loader.LastOptions.SelectedJobNames);
+    }
+
+    [Fact]
+    public async Task RunAsync_LoadsEnabledJobProviderSettings_WhenRunningAllJobs()
+    {
+        var config = CreateConfig(new JobDefinition { Name = "first", Prompt = "noop", Provider = "OpenAI", Enabled = true });
+        var loader = new FakeConfigLoader(config);
+        var runner = new JobRunner(
+            loader,
+            new FakeJobAgentFactory { PreparedAgent = new PreparedJobAgent(new FakeJobAgent("done"), new ToolSelectionSummary()) },
+            new FakeExecutionMemoryStore());
+
+        using var writer = new StringWriter();
+        await runner.RunAsync("config.yaml", null, writer, CancellationToken.None);
+
+        Assert.NotNull(loader.LastOptions);
+        Assert.Equal(ProviderValidationScope.EnabledJobs, loader.LastOptions!.ProviderValidationScope);
+        Assert.Empty(loader.LastOptions.SelectedJobNames);
+    }
+
+    [Fact]
     public async Task RunAsync_ExecutesJobWithoutPersistence_WhenDisabled()
     {
         var config = CreateConfig(new JobDefinition
@@ -37,6 +75,7 @@ public sealed class JobRunnerTests
             Name = "inspect",
             Prompt = "Review the repository",
             Provider = "OpenAI",
+            Workflow = "corporate-planning",
             AutoApprove = false,
             PersistMemory = false,
         });
@@ -51,6 +90,16 @@ public sealed class JobRunnerTests
                     TotalAvailableTools = 5,
                     EligibleTools = 5,
                     SelectorUsed = false,
+                    Workflow = "corporate-planning",
+                    GeneratedAgents =
+                    [
+                        new GeneratedAgentSummary
+                        {
+                            Name = "Planning Lead",
+                            Description = "Coordinates the final plan.",
+                            AssignedTools = ["ReadTextFile"],
+                        },
+                    ],
                 })
         };
         var memoryStore = new FakeExecutionMemoryStore();
@@ -64,9 +113,12 @@ public sealed class JobRunnerTests
         Assert.Equal(0, memoryStore.LoadCallCount);
         Assert.Equal(0, memoryStore.SaveCallCount);
         Assert.Contains("> Running job: inspect", output);
+        Assert.Contains("Workflow: corporate-planning", output);
+        Assert.Contains("Generated agent: Planning Lead | Tools=ReadTextFile", output);
         Assert.Contains("Selected tools: none", output);
         Assert.Contains("finished", output);
         Assert.DoesNotContain("  finished  ", output);
+        Assert.Contains("Workflow: corporate-planning", agent.LastPrompt);
         Assert.Contains("Mutation tools available: no", agent.LastPrompt);
     }
 
@@ -239,12 +291,15 @@ public sealed class JobRunnerTests
             new JobDefinition { Name = "one", Prompt = "a", Provider = "OpenAI" },
             new JobDefinition { Name = "two", Prompt = "b", Provider = "OpenAI" });
 
-        var runner = new JobRunner(new FakeConfigLoader(config), new FakeJobAgentFactory(), new FakeExecutionMemoryStore());
+        var loader = new FakeConfigLoader(config);
+        var runner = new JobRunner(loader, new FakeJobAgentFactory(), new FakeExecutionMemoryStore());
         using var writer = new StringWriter();
 
         var exitCode = await runner.ValidateAsync("config.yaml", writer, CancellationToken.None);
 
         Assert.Equal(0, exitCode);
+        Assert.NotNull(loader.LastOptions);
+        Assert.Equal(ProviderValidationScope.AllJobs, loader.LastOptions!.ProviderValidationScope);
         Assert.Contains("Configuration is valid. Jobs: 2.", writer.ToString());
     }
 
@@ -268,6 +323,20 @@ public sealed class JobRunnerTests
         Assert.Contains("Schedule=manual", lines[1]);
     }
 
+    [Fact]
+    public async Task ListJobsAsync_SkipsProviderCredentialValidation()
+    {
+        var config = CreateConfig(new JobDefinition { Name = "one", Prompt = "a", Provider = "OpenAI" });
+        var loader = new FakeConfigLoader(config);
+        var runner = new JobRunner(loader, new FakeJobAgentFactory(), new FakeExecutionMemoryStore());
+        using var writer = new StringWriter();
+
+        await runner.ListJobsAsync("config.yaml", writer, CancellationToken.None);
+
+        Assert.NotNull(loader.LastOptions);
+        Assert.Equal(ProviderValidationScope.None, loader.LastOptions!.ProviderValidationScope);
+    }
+
     private static AppConfig CreateConfig(params JobDefinition[] jobs)
     {
         var config = new AppConfig();
@@ -279,8 +348,11 @@ public sealed class JobRunnerTests
 
     private sealed class FakeConfigLoader(AppConfig config) : IAppConfigLoader
     {
-        public Task<AppConfig> LoadAsync(string path, CancellationToken cancellationToken)
+        public ConfigLoadOptions? LastOptions { get; private set; }
+
+        public Task<AppConfig> LoadAsync(string path, CancellationToken cancellationToken, ConfigLoadOptions? options = null)
         {
+            LastOptions = options;
             return Task.FromResult(config);
         }
     }

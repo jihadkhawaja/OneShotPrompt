@@ -101,6 +101,37 @@ public sealed class ProgramIntegrationTests
     }
 
     [Fact]
+    public async Task ConsoleApplication_ListJobs_IgnoresUnconfiguredProvidersOnOtherJobs()
+    {
+        using var workspace = new TestWorkspace();
+        var configPath = workspace.WriteFile("config.yaml", """
+            OpenAI:
+              ApiKey: key
+              Model: model
+            Anthropic:
+              ApiKey:
+              Model:
+            Jobs:
+              - Name: Daily
+                Prompt: Inspect the repository
+                Provider: OpenAI
+                Enabled: true
+              - Name: Audit
+                Prompt: Build the repository
+                Provider: Anthropic
+                Enabled: false
+            """);
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var exitCode = await ConsoleApplication.RunAsync(["jobs", "--config", configPath], output, error);
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("- Audit | Provider=Anthropic | Enabled=False", output.ToString());
+        Assert.Equal(string.Empty, error.ToString());
+    }
+
+    [Fact]
     public async Task Program_Help_PrintsUsageAndReturnsZero()
     {
         var result = await ProcessTestHarness.RunConsoleAsync("help");

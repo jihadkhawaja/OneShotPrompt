@@ -14,6 +14,8 @@ public sealed class AppConfig
 
     public GitHubCopilotProviderSettings GitHubCopilot { get; } = new();
 
+    public CorporatePlanningSettings CorporatePlanning { get; } = new();
+
     public string ThinkingLevel { get; set; } = "low";
 
     public bool PersistMemory { get; set; } = true;
@@ -70,6 +72,13 @@ public sealed class GitHubCopilotProviderSettings
     public bool AutoRestart { get; set; } = true;
 }
 
+public sealed class CorporatePlanningSettings
+{
+    public int MaxAgents { get; set; } = 4;
+
+    public int MaxIterations { get; set; } = 8;
+}
+
 public sealed class JobDefinition
 {
     public string Name { get; set; } = string.Empty;
@@ -88,11 +97,17 @@ public sealed class JobDefinition
 
     public bool Enabled { get; set; } = true;
 
+    public string Workflow { get; set; } = "single-agent";
+
     public List<string> AllowedTools { get; } = [];
 
     public bool ResolvePersistMemory(AppConfig config) => PersistMemory ?? config.PersistMemory;
 
     public string ResolveThinkingLevel(AppConfig config) => ThinkingLevel ?? config.ThinkingLevel;
+
+    public string ResolveWorkflow() => string.IsNullOrWhiteSpace(Workflow) ? "single-agent" : Workflow.Trim();
+
+    public bool UsesCorporatePlanning() => ResolveWorkflow().Equals("corporate-planning", StringComparison.OrdinalIgnoreCase);
 }
 
 public sealed class JobMemoryDocument

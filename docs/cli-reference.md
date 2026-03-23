@@ -45,6 +45,8 @@ dotnet run --project src/OneShotPrompt.Console -- -h
 
 Loads and validates the config file without running any jobs.
 
+This command validates provider settings for every job in the file, including disabled jobs.
+
 ```powershell
 dotnet run --project src/OneShotPrompt.Console -- validate --config config.yaml
 ```
@@ -101,8 +103,18 @@ During execution, the command prints:
 
 - `> Running job: <name>`
 - Tool-selection telemetry
+- Workflow details, including generated planning agents when `Workflow: "corporate-planning"` is enabled
 - The model response
 - Failure messages when exceptions occur
+
+Tool-selection telemetry can include:
+
+- The effective workflow for the job
+- The configured allowlist, when one exists
+- The final selected tool set
+- Generated agent names, descriptions, and assigned tools for `corporate-planning` jobs
+
+In interactive terminals, `corporate-planning` jobs can also stream live group-chat messages from the generated planning participants before the final response is printed.
 
 ### `interactive` and `-i`
 
@@ -150,6 +162,17 @@ Supported by:
 - `run`
 
 When omitted, all enabled jobs run. When provided, only the matching enabled job runs.
+
+When `--job` is provided, provider-setting validation is scoped to that selected job. Without `--job`, provider-setting validation is scoped to enabled jobs.
+
+## Job Workflow Notes
+
+Job execution behavior is also affected by each job's `Workflow` config value:
+
+- `single-agent`: the selected tool subset is attached to one execution agent.
+- `corporate-planning`: the selected tool subset is redistributed across a temporary planning team, and the CLI prints generated-agent telemetry before the final response.
+
+See [configuration.md](./configuration.md) for the full `Workflow` and `CorporatePlanning` settings.
 
 ## Exit Behavior
 

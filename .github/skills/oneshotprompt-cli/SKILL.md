@@ -28,10 +28,12 @@ Workflow:
 5. When documenting or testing single-job execution, use `run --config <path> --job <name>`.
 6. When describing interactive behavior, distinguish between explicit `interactive` and the no-argument behavior that depends on whether the terminal is interactive.
 7. For build or test validation in this repo, use the solution and test commands above rather than ad hoc project combinations unless the task is intentionally scoped to one project.
-8. If you change CLI behavior, command examples, scheduling flows, or bundled skills, update `README.md` and the relevant `docs/` pages in the same change.
+8. If jobs or config examples mention execution behavior, account for both `Workflow: "single-agent"` and `Workflow: "corporate-planning"` where relevant.
+9. If you change CLI behavior, command examples, scheduling flows, or bundled skills, update `README.md` and the relevant `docs/` pages in the same change.
 
 Guardrails:
 - Do not document or script unsupported subcommands or flags.
 - Do not treat `--job` as valid for `validate` or `jobs`.
 - Do not describe logs or memory as repo-root relative unless the active config file is at the repo root.
+- Do not describe every run as a single execution agent when a job can opt into the corporate-planning workflow.
 - Do not rely on shell-specific syntax in examples unless the task is explicitly shell-specific.

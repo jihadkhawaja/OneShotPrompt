@@ -139,7 +139,13 @@ internal static class InteractiveConsoleMenu
     private static async Task<int> SelectAndRunJobAsync(string configPath)
     {
         var loader = new YamlConfigLoader();
-        var config = await loader.LoadAsync(configPath, CancellationToken.None);
+        var config = await loader.LoadAsync(
+            configPath,
+            CancellationToken.None,
+            new ConfigLoadOptions
+            {
+                ProviderValidationScope = ProviderValidationScope.None,
+            });
         var enabledJobs = config.Jobs
             .Where(job => job.Enabled)
             .Select(job => job.Name)

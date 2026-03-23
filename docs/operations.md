@@ -110,21 +110,38 @@ During job execution, OneShotPrompt writes:
 
 - The job or ad-hoc prompt header.
 - Tool-selection telemetry.
+- Workflow telemetry.
 - The model response.
 - Failure messages when exceptions occur.
 
-When the app is attached to an interactive terminal, it also streams live job events through Spectre.Console, including reasoning, tool calls, and tool results.
+When the app is attached to an interactive terminal, it also streams live job events through Spectre.Console, including reasoning, tool calls, tool results, and generated group-chat messages for `corporate-planning` jobs.
 
 Tool-selection telemetry includes:
 
 - Total tools available before any allowlist filtering.
 - Tools eligible after allowlist filtering.
+- The effective workflow for the job.
 - The configured allowlist, when one exists.
 - Whether the selector was used.
 - The final selected tool set.
 - Any selector rationale returned by the model.
 
+For `corporate-planning` jobs, the telemetry also includes each generated planning participant and the subset of tools assigned to that participant.
+
 Every `run` invocation writes a timestamped log file under `logs/` next to the active config file. Interactive direct prompts write to the same location.
+
+If a job uses `Workflow: "corporate-planning"`, the log file also records streamed group-chat events and explicit output boundaries around the final rendered response.
+
+## Workflow Selection
+
+Jobs default to `Workflow: "single-agent"`.
+
+Use `Workflow: "corporate-planning"` when the task benefits from a short planning discussion among dynamically generated specialists before OneShotPrompt returns the final answer. Keep `single-agent` for straightforward tasks where extra coordination would add latency without improving the result.
+
+If you adopt `corporate-planning`, validate the related top-level settings as part of rollout:
+
+- `CorporatePlanning.MaxAgents`
+- `CorporatePlanning.MaxIterations`
 
 ## Memory Behavior
 

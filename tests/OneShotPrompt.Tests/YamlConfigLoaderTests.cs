@@ -1,3 +1,4 @@
+using OneShotPrompt.Core.Models;
 using OneShotPrompt.Infrastructure.Configuration;
 
 namespace OneShotPrompt.Tests;
@@ -32,10 +33,14 @@ public sealed class YamlConfigLoaderTests
               LogLevel: debug
               AutoStart: false
               AutoRestart: false
+            CorporatePlanning:
+              MaxAgents: 5
+              MaxIterations: 9
             Jobs:
               - Name: Example
                 Prompt: "Do useful work"
                 Provider: OpenAI
+                Workflow: corporate-planning
                 AutoApprove: true
                 PersistMemory: true
                 ThinkingLevel: medium
@@ -58,11 +63,14 @@ public sealed class YamlConfigLoaderTests
         Assert.Equal("debug", config.GitHubCopilot.LogLevel);
         Assert.False(config.GitHubCopilot.AutoStart);
         Assert.False(config.GitHubCopilot.AutoRestart);
+        Assert.Equal(5, config.CorporatePlanning.MaxAgents);
+        Assert.Equal(9, config.CorporatePlanning.MaxIterations);
 
         var job = Assert.Single(config.Jobs);
         Assert.Equal("Example", job.Name);
         Assert.Equal("Do useful work", job.Prompt);
         Assert.Equal("OpenAI", job.Provider);
+        Assert.Equal("corporate-planning", job.Workflow);
         Assert.True(job.AutoApprove);
         Assert.True(job.PersistMemory);
         Assert.Equal("medium", job.ThinkingLevel);
@@ -190,6 +198,53 @@ public sealed class YamlConfigLoaderTests
     }
 
     [Fact]
+    public async Task LoadAsync_RejectsInvalidWorkflowAndCorporatePlanningSettings()
+    {
+        var invalidWorkflow = await LoadInvalidConfigAsync("""
+            OpenAI:
+              ApiKey: key
+              Model: model
+            Jobs:
+              - Name: Daily
+                Prompt: first
+                Provider: OpenAI
+                Workflow: swarm
+            """);
+
+        Assert.Equal("'Jobs[Daily].Workflow' must be one of: single-agent, corporate-planning.", invalidWorkflow.Message);
+
+        var invalidMaxAgents = await LoadInvalidConfigAsync("""
+            CorporatePlanning:
+              MaxAgents: 1
+            OpenAI:
+              ApiKey: key
+              Model: model
+            Jobs:
+              - Name: Daily
+                Prompt: first
+                Provider: OpenAI
+                Workflow: corporate-planning
+            """);
+
+        Assert.Equal("'CorporatePlanning.MaxAgents' must be at least 2.", invalidMaxAgents.Message);
+
+        var invalidMaxIterations = await LoadInvalidConfigAsync("""
+            CorporatePlanning:
+              MaxIterations: 0
+            OpenAI:
+              ApiKey: key
+              Model: model
+            Jobs:
+              - Name: Daily
+                Prompt: first
+                Provider: OpenAI
+                Workflow: corporate-planning
+            """);
+
+        Assert.Equal("'CorporatePlanning.MaxIterations' must be at least 1.", invalidMaxIterations.Message);
+    }
+
+    [Fact]
     public async Task LoadAsync_RejectsUnknownAndMutationRestrictedAllowedTools()
     {
         var unknownTool = await LoadInvalidConfigAsync("""
@@ -271,6 +326,50 @@ public sealed class YamlConfigLoaderTests
             """);
 
         Assert.Equal("Job 'Daily' requires 'Gemini.Model' to be configured.", gemini.Message);
+    }
+
+    [Fact]
+    public async Task LoadAsync_CanSkipProviderValidationForUnselectedJobs()
+    {
+        using var workspace = new TestWorkspace();
+        var path = workspace.WriteFile("config.yaml", """
+            OpenAI:
+              ApiKey: key
+              Model: model
+            Anthropic:
+              ApiKey:
+              Model:
+            Jobs:
+              - Name: Daily
+                Prompt: first
+                Provider: OpenAI
+                Enabled: true
+              - Name: Audit
+                Prompt: second
+                Provider: Anthropic
+                Enabled: true
+            """);
+
+        var selectedConfig = await _loader.LoadAsync(
+            path,
+            CancellationToken.None,
+            new ConfigLoadOptions
+            {
+                ProviderValidationScope = ProviderValidationScope.SelectedJobs,
+                SelectedJobNames = ["Daily"],
+            });
+
+        Assert.Equal(2, selectedConfig.Jobs.Count);
+
+        var enabledException = await Assert.ThrowsAsync<InvalidOperationException>(() => _loader.LoadAsync(
+            path,
+            CancellationToken.None,
+            new ConfigLoadOptions
+            {
+                ProviderValidationScope = ProviderValidationScope.EnabledJobs,
+            }));
+
+        Assert.Equal("Job 'Audit' requires 'Anthropic.ApiKey' to be configured.", enabledException.Message);
     }
 
     [Fact]

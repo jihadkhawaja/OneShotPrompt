@@ -2,6 +2,7 @@ using OneShotPrompt.Core.Models;
 using OneShotPrompt.Infrastructure.Logging;
 using OneShotPrompt.Infrastructure.Persistence;
 using OneShotPrompt.Infrastructure.Tools;
+using Microsoft.Extensions.AI;
 
 namespace OneShotPrompt.Tests;
 
@@ -45,6 +46,42 @@ public sealed class InfrastructureTests
     }
 
     [Fact]
+    public void OpenAICompatibleChatClient_SanitizeOptions_RemovesUnsupportedFields()
+    {
+        var clientType = Type.GetType("OneShotPrompt.Infrastructure.Providers.OpenAICompatibleChatClient, OneShotPrompt.Infrastructure")!;
+        var options = new ChatOptions
+        {
+            Instructions = "Keep it brief.",
+            Temperature = 0.2f,
+            TopP = 0.75f,
+            Seed = 42,
+            AllowMultipleToolCalls = true,
+            RawRepresentationFactory = _ => new object(),
+            Reasoning = new ReasoningOptions { Effort = ReasoningEffort.High },
+            ResponseFormat = ChatResponseFormat.Text,
+            ToolMode = ChatToolMode.RequireAny,
+            Tools = [],
+            AdditionalProperties = [],
+        };
+        options.AdditionalProperties["repeat_penalty"] = 1.05f;
+
+        var sanitized = (ChatOptions)ProcessTestHarness.InvokePrivateStatic(clientType, "SanitizeOptions", options)!;
+
+        Assert.NotSame(options, sanitized);
+        Assert.Equal(options.Instructions, sanitized.Instructions);
+        Assert.Equal(options.Temperature, sanitized.Temperature);
+        Assert.Equal(options.TopP, sanitized.TopP);
+        Assert.Equal(options.Seed, sanitized.Seed);
+        Assert.Null(sanitized.AllowMultipleToolCalls);
+        Assert.Null(sanitized.RawRepresentationFactory);
+        Assert.Null(sanitized.Reasoning);
+        Assert.Null(sanitized.ResponseFormat);
+        Assert.Null(sanitized.ToolMode);
+        Assert.NotNull(sanitized.AdditionalProperties);
+        Assert.Empty(sanitized.AdditionalProperties);
+    }
+
+    [Fact]
     public async Task FileExecutionMemoryStore_LoadMissing_ReturnsEmptyDocument()
     {
         using var workspace = new TestWorkspace();
@@ -84,6 +121,20 @@ public sealed class InfrastructureTests
         var entry = Assert.Single(loaded.Entries);
         Assert.Equal("prompt", entry.Prompt);
         Assert.Equal("response", entry.Response);
+    }
+
+    [Fact]
+    public async Task FileJobLogger_WritesGroupChatEvents()
+    {
+        using var workspace = new TestWorkspace();
+        var logger = new FileJobLogger(workspace.RootPath);
+        logger.Emit(new GroupChatMessageEvent("Planning Lead", "Drafting the final plan."));
+        await logger.DisposeAsync();
+
+        var logPath = Assert.Single(Directory.GetFiles(workspace.RootPath, "*.log"));
+        var contents = await File.ReadAllTextAsync(logPath);
+
+        Assert.Contains("GROUP_CHAT: Planning Lead | Drafting the final plan.", contents);
     }
 
     [Fact]

@@ -4,5 +4,5 @@ namespace OneShotPrompt.Application.Abstractions;
 
 public interface IAppConfigLoader
 {
-    Task<AppConfig> LoadAsync(string path, CancellationToken cancellationToken);
+    Task<AppConfig> LoadAsync(string path, CancellationToken cancellationToken, ConfigLoadOptions? options = null);
 }

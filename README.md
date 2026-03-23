@@ -20,6 +20,7 @@ Most AI automation tools either hide too much behavior or ask you to build a ful
 - Load jobs from YAML and validate configuration before execution.
 - Run bundled and user-provided Agent Skills.
 - Perform a tool-selection pass before the execution agent runs.
+- Run an optional dynamic `corporate-planning` group chat before returning the final response.
 - Stream agent activity live in interactive terminals with Spectre.Console.
 - Write structured execution logs to a `logs/` directory next to the active config file.
 - Store per-job memory in `.oneshotprompt/memory/` when memory is enabled.
@@ -33,7 +34,9 @@ flowchart LR
   Config["config.yaml"] --> Console["CLI / interactive console"]
   Skills["Bundled + custom skills"] --> Selector["Tool-selection pass"]
   Console --> Selector
+  Selector --> Planning["Corporate-planning group chat"]
   Selector --> Agent["Execution agent"]
+  Planning --> Agent
   Agent --> Tools["Filesystem + process tools"]
   Agent --> Memory["Per-job memory"]
   Agent --> Providers["OpenAI / Anthropic / Gemini / Compatible APIs / GitHub Copilot"]
@@ -80,6 +83,7 @@ Jobs:
   - Name: "downloads-cleanup"
     Prompt: "Organize files in Downloads by type"
     Provider: "OpenAI"
+    Workflow: "single-agent"
     AutoApprove: true
     AllowedTools: "GetKnownFolder, ListDirectory, MoveFiles, CreateDirectory"
     Enabled: true
@@ -149,6 +153,8 @@ Current built-in tools include:
 
 Use read-only jobs for inspection, analysis, and planning. Only enable mutation when the job is deterministic enough that you are comfortable granting write access.
 
+Jobs can also opt into `Workflow: "corporate-planning"`. In that mode, OneShotPrompt keeps the same provider and tool-selection pass, then generates a temporary team of specialist agents on the fly, assigns each agent a subset of the selected tools, and runs them in a Microsoft Agent Framework group chat until one agent emits the final response payload.
+
 ## Agent Skills
 
 OneShotPrompt automatically loads Agent Skills from two places:
@@ -157,6 +163,8 @@ OneShotPrompt automatically loads Agent Skills from two places:
 - A `skills/` directory next to the active config file
 
 Before the main execution agent is created, the runtime runs a selector pass that chooses the smallest relevant tool subset for the job. The execution agent then runs with that selected subset.
+
+If a job uses `Workflow: "corporate-planning"`, the selected subset is redistributed across dynamically generated planning agents rather than attached to one execution agent.
 
 ## Logging And Memory
 
@@ -207,6 +215,7 @@ dotnet test tests/OneShotPrompt.Tests/OneShotPrompt.Tests.csproj
 ## Notes
 
 - `ThinkingLevel` accepts `low`, `medium`, or `high`.
+- `Workflow` accepts `single-agent` or `corporate-planning`.
 - Custom skills can be placed in a `skills/` directory next to the active config file.
 - `MoveFiles` moves multiple files concurrently and is usually preferable to repeated `MoveFile` calls.
 - Configuration validation rejects unsupported YAML sections or properties.

@@ -20,6 +20,8 @@ One config file contains:
 
 Each job chooses one provider, one prompt, and an execution policy. At runtime, OneShotPrompt narrows the tool catalog first, then runs the execution agent with only the selected subset.
 
+Jobs can optionally switch to `Workflow: "corporate-planning"`. In that mode, the runtime still performs tool selection first, then creates a temporary team of specialist agents on the fly, assigns them subsets of the selected tools, and runs them in a group chat until the final response is complete or the iteration limit is reached.
+
 ## Supported Top-Level Sections
 
 These top-level sections are recognized:
@@ -29,6 +31,7 @@ These top-level sections are recognized:
 - `Gemini`
 - `OpenAICompatible`
 - `GitHubCopilot`
+- `CorporatePlanning`
 - `ThinkingLevel`
 - `PersistMemory`
 - `Jobs`
@@ -89,6 +92,13 @@ Rules enforced by validation:
 
 GitHub Copilot jobs require the GitHub Copilot CLI to be installed and authenticated. The runtime disables Copilot's built-in shell, file, and URL permissions and keeps local access scoped to OneShotPrompt's selected built-in tools.
 
+### CorporatePlanning
+
+- `MaxAgents`: optional. Maximum number of dynamically generated planning participants. Minimum: `2`. Default: `4`.
+- `MaxIterations`: optional. Maximum number of group-chat turns before the workflow stops. Minimum: `1`. Default: `8`.
+
+These settings matter only for jobs that set `Workflow: "corporate-planning"`.
+
 ## Global Defaults
 
 ### `ThinkingLevel`
@@ -114,6 +124,7 @@ Each entry under `Jobs:` supports these properties:
 - `Name`: required, unique across the file.
 - `Prompt`: required.
 - `Provider`: required. Must be `OpenAI`, `Anthropic`, `Gemini`, `OpenAICompatible`, or `GitHubCopilot`.
+- `Workflow`: optional. Must be `single-agent` or `corporate-planning`. Default: `single-agent`.
 - `AutoApprove`: optional. Default: `false`.
 - `AllowedTools`: optional tool allowlist.
 - `PersistMemory`: optional job-level override for the global setting.
@@ -122,6 +133,17 @@ Each entry under `Jobs:` supports these properties:
 - `Enabled`: optional. Default: `true`.
 
 `Schedule` is descriptive only. OneShotPrompt does not schedule jobs itself.
+
+## Workflow Modes
+
+`single-agent` keeps the existing behavior: one selector pass, then one execution agent.
+
+`corporate-planning` inserts a collaborative planning layer that:
+
+- Generates a small specialist team per task.
+- Assigns each generated agent an allowed subset of the selected tools.
+- Runs the team in a Microsoft Agent Framework group chat.
+- Stops when a generated agent emits the final response payload or the configured iteration limit is reached.
 
 ## Tool Access Model
 
@@ -173,9 +195,12 @@ Validation fails when any of these conditions is true:
 - A job references an unsupported provider.
 - A provider used by a job is missing required settings.
 - `ThinkingLevel` is not one of `low`, `medium`, or `high`.
+- `Workflow` is not `single-agent` or `corporate-planning`.
 - `AllowedTools` contains duplicates.
 - `AllowedTools` contains unknown tool names.
 - `AllowedTools` includes mutation tools while `AutoApprove` is `false`.
+- `CorporatePlanning.MaxAgents` is less than `2`.
+- `CorporatePlanning.MaxIterations` is less than `1`.
 - `GitHubCopilot.CliUrl` conflicts with other GitHub Copilot connection settings.
 - The YAML file contains unsupported sections or unsupported properties inside known sections.
 
@@ -210,6 +235,10 @@ GitHubCopilot:
   AutoStart: true
   AutoRestart: true
 
+CorporatePlanning:
+  MaxAgents: 4
+  MaxIterations: 8
+
 ThinkingLevel: "low"
 PersistMemory: true
 
@@ -217,12 +246,53 @@ Jobs:
   - Name: "downloads-cleanup"
     Prompt: "Organize files in Downloads by type"
     Provider: "OpenAI"
+    Workflow: "single-agent"
     AutoApprove: true
-    AllowedTools: "GetKnownFolder, ListDirectory, MoveFiles, CreateDirectory"
+    AllowedTools: "GetKnownFolder, ListDirectory, MoveFile, MoveFiles, CreateDirectory"
     PersistMemory: false
     ThinkingLevel: "low"
     Schedule: "Daily at midnight"
     Enabled: true
+
+  - Name: "compatible-system-info"
+    Prompt: "Gather basic system information for this machine. Use available commands to report the OS, hostname, current user, current working directory, and installed .NET SDK/runtime details. Do not make changes."
+    Provider: "OpenAICompatible"
+    Workflow: "single-agent"
+    AutoApprove: true
+    AllowedTools: "RunCommand"
+    PersistMemory: false
+    ThinkingLevel: "low"
+    Enabled: false
+
+  - Name: "repo-build-check"
+    Prompt: "Build the repository next to this config file with dotnet and summarize any failures."
+    Provider: "Anthropic"
+    Workflow: "corporate-planning"
+    AutoApprove: true
+    AllowedTools: "RunDotNetCommand, ReadTextFile, ListDirectory"
+    PersistMemory: false
+    ThinkingLevel: "medium"
+    Enabled: false
+
+  - Name: "gemini-repo-summary"
+    Prompt: "Inspect the repository next to this config file and summarize the main architecture and any obvious risks without making changes."
+    Provider: "Gemini"
+    Workflow: "single-agent"
+    AutoApprove: false
+    AllowedTools: "ListDirectory, ReadTextFile, ReadTextFileLines, GetTextFileLength"
+    PersistMemory: false
+    ThinkingLevel: "medium"
+    Enabled: false
+
+  - Name: "copilot-repo-audit"
+    Prompt: "Inspect the repository next to this config file and summarize the highest-risk issues without making changes."
+    Provider: "GitHubCopilot"
+    Workflow: "corporate-planning"
+    AutoApprove: false
+    AllowedTools: "ListDirectory, ReadTextFile, ReadTextFileLines, GetTextFileLength"
+    PersistMemory: false
+    ThinkingLevel: "medium"
+    Enabled: false
 ```
 
 ## Validate Before Running

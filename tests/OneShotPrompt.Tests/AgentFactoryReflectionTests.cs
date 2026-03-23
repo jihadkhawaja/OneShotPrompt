@@ -51,7 +51,10 @@ public sealed class AgentFactoryReflectionTests
     [Fact]
     public void CreateChatClient_ReturnsClientForOpenAICompatible()
     {
-        Assert.NotNull(ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "CreateChatClient", CreateConfig(), JobProvider.OpenAICompatible));
+        var client = ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "CreateChatClient", CreateConfig(), JobProvider.OpenAICompatible);
+
+        Assert.NotNull(client);
+        Assert.Equal("OneShotPrompt.Infrastructure.Providers.OpenAICompatibleChatClient", client!.GetType().FullName);
     }
 
     [Fact]
@@ -300,6 +303,66 @@ public sealed class AgentFactoryReflectionTests
         Assert.Contains("Mutation tools are not available.", instructions);
         Assert.Contains("Mutation tools are unavailable, so prefer inspection-only planning.", selectorInstructions);
         Assert.Contains("Mutation tools available: no", prompt);
+    }
+
+    [Fact]
+    public void CorporatePlanningHelpers_ExposeExpectedContextAndFallbacks()
+    {
+        var config = CreateConfig();
+        config.CorporatePlanning.MaxAgents = 4;
+        config.CorporatePlanning.MaxIterations = 7;
+
+        var job = new JobDefinition
+        {
+            Name = "plan",
+            Prompt = "Design a safe repository change plan.",
+            Provider = nameof(JobProvider.OpenAI),
+            Workflow = "corporate-planning",
+            AutoApprove = true,
+        };
+
+        var selectedTools = ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "BuildToolDefinitions", job, AppContext.BaseDirectory)!;
+        var architectInstructions = (string)ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "BuildCorporatePlanningArchitectInstructions", config, job, 13)!;
+        var architectPrompt = (string)ProcessTestHarness.InvokePrivateStatic(typeof(AgentFactory), "BuildCorporatePlanningArchitectPrompt", config, job, selectedTools)!;
+        var parsedParticipants = (IEnumerable<object>)ProcessTestHarness.InvokePrivateStatic(
+            typeof(AgentFactory),
+            "ParseCorporatePlanningParticipants",
+            """
+            AGENT: Planning Lead
+            DESCRIPTION: Owns the final synthesis.
+            TOOLS: NONE
+            INSTRUCTIONS: Consolidate the plan when ready.
+            END_AGENT
+            AGENT: Repo Analyst
+            DESCRIPTION: Reads the repository and extracts evidence.
+            TOOLS: ReadTextFile, ListDirectory
+            INSTRUCTIONS: Inspect files and summarize the important evidence.
+            END_AGENT
+            """,
+            config,
+            selectedTools)!;
+        var fallbackParticipants = (IEnumerable<object>)ProcessTestHarness.InvokePrivateStatic(
+            typeof(AgentFactory),
+            "ParseCorporatePlanningParticipants",
+            "AGENT: only-one",
+            config,
+            selectedTools)!;
+
+        Assert.Contains("Return between 2 and 4 agent blocks.", architectInstructions);
+        Assert.Contains("The first agent must be able to conclude with FINAL_RESPONSE:", architectInstructions);
+        Assert.Contains("Workflow: corporate-planning", architectPrompt);
+        Assert.Contains("Selected tools available to distribute:", architectPrompt);
+
+        var parsedList = parsedParticipants.ToList();
+        Assert.Equal(2, parsedList.Count);
+        Assert.Equal("Planning Lead", parsedList[0].GetType().GetProperty("Name")!.GetValue(parsedList[0]));
+
+        var fallbackNames = fallbackParticipants
+            .Select(item => (string)item.GetType().GetProperty("Name")!.GetValue(item)!)
+            .ToList();
+
+        Assert.Contains("Planning Lead", fallbackNames);
+        Assert.Contains("Task Analyst", fallbackNames);
     }
 
     [Fact]

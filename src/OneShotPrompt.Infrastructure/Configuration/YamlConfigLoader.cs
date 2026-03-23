@@ -6,7 +6,7 @@ namespace OneShotPrompt.Infrastructure.Configuration;
 
 public sealed class YamlConfigLoader : IAppConfigLoader
 {
-    public async Task<AppConfig> LoadAsync(string path, CancellationToken cancellationToken)
+    public async Task<AppConfig> LoadAsync(string path, CancellationToken cancellationToken, ConfigLoadOptions? options = null)
     {
         var fullPath = Path.GetFullPath(path);
 
@@ -17,7 +17,7 @@ public sealed class YamlConfigLoader : IAppConfigLoader
 
         var lines = await File.ReadAllLinesAsync(fullPath, cancellationToken);
         var config = Parse(lines);
-        Validate(config, fullPath);
+        Validate(config, fullPath, options ?? new ConfigLoadOptions());
         return config;
     }
 
@@ -57,6 +57,9 @@ public sealed class YamlConfigLoader : IAppConfigLoader
                         break;
                     case "GitHubCopilot":
                         ParseProviderSection(lines, ref index, 2, AssignGitHubCopilot);
+                        break;
+                    case "CorporatePlanning":
+                        ParseProviderSection(lines, ref index, 2, AssignCorporatePlanning);
                         break;
                     case "Jobs":
                         ParseJobs(lines, ref index, config.Jobs);
@@ -200,6 +203,23 @@ public sealed class YamlConfigLoader : IAppConfigLoader
             }
 
             throw new InvalidOperationException($"Unsupported GitHubCopilot setting '{key}'.");
+        }
+
+        void AssignCorporatePlanning(string key, object value)
+        {
+            if (key.Equals("MaxAgents", StringComparison.OrdinalIgnoreCase))
+            {
+                config.CorporatePlanning.MaxAgents = ToIntValue(value, key);
+                return;
+            }
+
+            if (key.Equals("MaxIterations", StringComparison.OrdinalIgnoreCase))
+            {
+                config.CorporatePlanning.MaxIterations = ToIntValue(value, key);
+                return;
+            }
+
+            throw new InvalidOperationException($"Unsupported CorporatePlanning setting '{key}'.");
         }
     }
 
@@ -352,6 +372,12 @@ public sealed class YamlConfigLoader : IAppConfigLoader
             return;
         }
 
+        if (key.Equals("Workflow", StringComparison.OrdinalIgnoreCase))
+        {
+            job.Workflow = ToStringValue(value);
+            return;
+        }
+
         if (key.Equals("AllowedTools", StringComparison.OrdinalIgnoreCase))
         {
             job.AllowedTools.Clear();
@@ -367,7 +393,7 @@ public sealed class YamlConfigLoader : IAppConfigLoader
         throw new InvalidOperationException($"Unsupported job setting '{key}'.");
     }
 
-    private static void Validate(AppConfig config, string fullPath)
+    private static void Validate(AppConfig config, string fullPath, ConfigLoadOptions options)
     {
         if (config.Jobs.Count == 0)
         {
@@ -375,6 +401,7 @@ public sealed class YamlConfigLoader : IAppConfigLoader
         }
 
         EnsureThinkingLevel(config.ThinkingLevel, "ThinkingLevel");
+        ValidateCorporatePlanningSettings(config.CorporatePlanning);
         var duplicateName = config.Jobs
             .GroupBy(job => job.Name, StringComparer.OrdinalIgnoreCase)
             .FirstOrDefault(group => !string.IsNullOrWhiteSpace(group.Key) && group.Count() > 1);
@@ -406,10 +433,26 @@ public sealed class YamlConfigLoader : IAppConfigLoader
                 EnsureThinkingLevel(job.ThinkingLevel, $"Jobs[{job.Name}].ThinkingLevel");
             }
 
+            EnsureWorkflow(job.ResolveWorkflow(), $"Jobs[{job.Name}].Workflow");
+
             ValidateAllowedTools(job);
 
-            ValidateProviderSettings(config, job.Name, provider);
+            if (ShouldValidateProviderSettings(job, options))
+            {
+                ValidateProviderSettings(config, job.Name, provider);
+            }
         }
+    }
+
+    private static bool ShouldValidateProviderSettings(JobDefinition job, ConfigLoadOptions options)
+    {
+        return options.ProviderValidationScope switch
+        {
+            ProviderValidationScope.None => false,
+            ProviderValidationScope.EnabledJobs => job.Enabled,
+            ProviderValidationScope.SelectedJobs => options.SelectedJobNames.Any(name => string.Equals(name, job.Name, StringComparison.OrdinalIgnoreCase)),
+            _ => true,
+        };
     }
 
     private static void ValidateAllowedTools(JobDefinition job)
@@ -480,6 +523,19 @@ public sealed class YamlConfigLoader : IAppConfigLoader
         }
     }
 
+    private static void ValidateCorporatePlanningSettings(CorporatePlanningSettings settings)
+    {
+        if (settings.MaxAgents < 2)
+        {
+            throw new InvalidOperationException("'CorporatePlanning.MaxAgents' must be at least 2.");
+        }
+
+        if (settings.MaxIterations < 1)
+        {
+            throw new InvalidOperationException("'CorporatePlanning.MaxIterations' must be at least 1.");
+        }
+    }
+
     private static void EnsureRequired(string value, string jobName, string setting)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -494,6 +550,17 @@ public sealed class YamlConfigLoader : IAppConfigLoader
         {
             throw new InvalidOperationException($"'{location}' must be one of: low, medium, high.");
         }
+    }
+
+    private static void EnsureWorkflow(string value, string location)
+    {
+        if (value.Equals("single-agent", StringComparison.OrdinalIgnoreCase) ||
+            value.Equals("corporate-planning", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException($"'{location}' must be one of: single-agent, corporate-planning.");
     }
 
     private static List<string> ParseAllowedTools(object value)
@@ -551,10 +618,24 @@ public sealed class YamlConfigLoader : IAppConfigLoader
             return boolValue;
         }
 
+        if (int.TryParse(value, out var intValue))
+        {
+            return intValue;
+        }
+
         return value;
     }
 
     private static string ToStringValue(object value) => value.ToString() ?? string.Empty;
+
+    private static int ToIntValue(object value, string key)
+    {
+        return value switch
+        {
+            int intValue => intValue,
+            _ => throw new InvalidOperationException($"'{key}' must be an integer value."),
+        };
+    }
 
     private static bool ToBoolValue(object value, string key)
     {

@@ -45,7 +45,13 @@ internal static class ConsoleApplication
         try
         {
             var configDirectory = Path.GetDirectoryName(Path.GetFullPath(configPath)) ?? Environment.CurrentDirectory;
-            var config = await new YamlConfigLoader().LoadAsync(configPath, cancellationSource.Token);
+            var config = await new YamlConfigLoader().LoadAsync(
+                configPath,
+                cancellationSource.Token,
+                new ConfigLoadOptions
+                {
+                    ProviderValidationScope = ProviderValidationScope.None,
+                });
 
             var sinks = new List<IJobEventSink>
             {
