@@ -382,11 +382,13 @@ public sealed class JobRunnerTests
             Enabled = true,
         });
 
+        var agent = new FakeJobAgent("done");
+
         var runner = new JobRunner(
             new FakeConfigLoader(config),
             new FakeJobAgentFactory
             {
-                PreparedAgent = new PreparedJobAgent(new FakeJobAgent("done"), new ToolSelectionSummary())
+                PreparedAgent = new PreparedJobAgent(agent, new ToolSelectionSummary())
             },
             new FakeExecutionMemoryStore());
 
@@ -422,6 +424,9 @@ public sealed class JobRunnerTests
         Assert.Contains("> Running job: personal-whatsapp-reply", output);
         Assert.Contains("done", output);
         Assert.Contains("> Listener stopped for job: personal-whatsapp-reply (triggers handled: 1)", output);
+        Assert.Contains("Current trigger:", agent.LastPrompt);
+        Assert.Contains("- Source: whatsapp-personal-channel", agent.LastPrompt);
+        Assert.Contains("- Summary: Incoming message from 15551234567: Hello there", agent.LastPrompt);
     }
 
     [Fact]

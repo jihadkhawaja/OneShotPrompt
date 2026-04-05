@@ -13,6 +13,16 @@ public sealed class JobRunner(
 {
     public async Task<int> RunAsync(string configPath, string? jobName, TextWriter output, CancellationToken cancellationToken)
     {
+        return await RunInternalAsync(configPath, jobName, trigger: null, output, cancellationToken);
+    }
+
+    private async Task<int> RunInternalAsync(
+        string configPath,
+        string? jobName,
+        JobTriggerSignal? trigger,
+        TextWriter output,
+        CancellationToken cancellationToken)
+    {
         var config = await configLoader.LoadAsync(
             configPath,
             cancellationToken,
@@ -41,7 +51,7 @@ public sealed class JobRunner(
                 ? await memoryStore.LoadAsync(configDirectory, job.Name, cancellationToken)
                 : new JobMemoryDocument();
 
-            var prompt = BuildPrompt(config, job, memory);
+            var prompt = BuildPrompt(config, job, memory, trigger);
 
             try
             {
@@ -133,7 +143,7 @@ public sealed class JobRunner(
                 eventSink?.Emit(new JobLogEvent($"Trigger received: {jobName} -- {trigger.Source} -- {trigger.Summary}"));
                 await output.WriteLineAsync($"> Trigger received: {trigger.Source} | {trigger.Summary}");
 
-                var exitCode = await RunAsync(configPath, jobName, output, cancellationToken);
+                var exitCode = await RunInternalAsync(configPath, jobName, trigger, output, cancellationToken);
                 if (exitCode != 0)
                 {
                     hasFailures = true;
@@ -241,7 +251,7 @@ public sealed class JobRunner(
         return query.ToList();
     }
 
-    private static string BuildPrompt(AppConfig config, JobDefinition job, JobMemoryDocument memory)
+    private static string BuildPrompt(AppConfig config, JobDefinition job, JobMemoryDocument memory, JobTriggerSignal? trigger)
     {
         var builder = new StringBuilder();
         builder.AppendLine($"Job: {job.Name}");
@@ -254,6 +264,14 @@ public sealed class JobRunner(
         if (!string.IsNullOrWhiteSpace(job.Schedule))
         {
             builder.AppendLine($"Requested schedule metadata: {job.Schedule}");
+        }
+
+        if (trigger is not null)
+        {
+            builder.AppendLine();
+            builder.AppendLine("Current trigger:");
+            builder.AppendLine($"- Source: {trigger.Source}");
+            builder.AppendLine($"- Summary: {trigger.Summary}");
         }
 
         if (memory.Entries.Count > 0)

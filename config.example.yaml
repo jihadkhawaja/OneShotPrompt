@@ -89,7 +89,7 @@ Jobs:
     Enabled: false
 
   - Name: "personal-whatsapp-reply"
-    Prompt: 'Use the whatsapp-personal-channel skill. Check bridge health first with "node tools/whatsapp-personal-channel/channel.mjs health". Then inspect unread inbound messages with "node tools/whatsapp-personal-channel/channel.mjs list-unread --limit 10". If there are no unread messages, say so and do not send anything. If a reply is clearly warranted, send exactly one concise reply with "node tools/whatsapp-personal-channel/channel.mjs send --text \"...\"". Never contact any number outside the bridge allowlist.'
+    Prompt: 'Use the whatsapp-personal-channel skill. If the inbound message requests local machine work, also use the command-execution skill. Treat the latest trigger context, when present, as the current inbound request. Check bridge health first with "node tools/whatsapp-personal-channel/channel.mjs health", then inspect unread inbound messages with "node tools/whatsapp-personal-channel/channel.mjs list-unread --limit 10". If an allowlisted sender makes a clear and safe local action request that can be completed with RunCommand, execute the narrowest direct command needed, verify the exit code and output, and then send exactly one concise status reply to that same sender with "node tools/whatsapp-personal-channel/channel.mjs send --phone <digits> --text \"...\"". If the request is ambiguous, risky, or the command fails, send exactly one concise clarification or failure reply instead. Never claim an action was completed unless the command output confirms success. Never contact any number outside the bridge allowlist.'
     Provider: "OpenAI"
     Workflow: "single-agent"
     AutoApprove: true

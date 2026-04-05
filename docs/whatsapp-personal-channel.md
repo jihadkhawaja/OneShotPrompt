@@ -2,7 +2,7 @@
 
 This workspace now includes a local unofficial WhatsApp bridge that works with a personal WhatsApp account through WhatsApp Web.
 
-It is designed for one narrow use case: let OneShotPrompt read unread messages and reply only to the phone number or numbers you explicitly allow in the bridge config.
+It is designed for a narrow allowlisted use case: let OneShotPrompt read unread messages and either send a concise reply or carry out an explicit local action for the phone number or numbers you explicitly allow in the bridge config.
 
 ## Files
 
@@ -44,6 +44,8 @@ It is designed for one narrow use case: let OneShotPrompt read unread messages a
    dotnet run --project src/OneShotPrompt.Console -- listen --config config.yaml --job personal-whatsapp-reply
    ```
 
+The sample `personal-whatsapp-reply` job is configured to use `RunCommand` only. With the bundled skill and prompt, it can confirm bridge health, inspect unread messages, execute a clear local action request, and send one concise reply back to the triggering allowlisted number.
+
 ## Bridge Commands
 
 These commands all run from the repository root.
@@ -54,10 +56,10 @@ node tools/whatsapp-personal-channel/channel.mjs health
 node tools/whatsapp-personal-channel/channel.mjs list-unread --limit 10
 node tools/whatsapp-personal-channel/channel.mjs list-recent --limit 10
 node tools/whatsapp-personal-channel/channel.mjs wait-next-message --timeout-seconds 300
-node tools/whatsapp-personal-channel/channel.mjs send --text "Hello"
+node tools/whatsapp-personal-channel/channel.mjs send --phone 15551234567 --text "Hello"
 ```
 
-If you allowlist more than one number, pass `--phone <digits>` to `list-recent` and `send`.
+Pass `--phone <digits>` to `list-recent` and `send` so the action or reply is pinned to the intended sender.
 
 ## Notes
 
