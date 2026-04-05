@@ -35,6 +35,16 @@ public sealed class CommandLineArgumentsTests
         Assert.Equal("nightly", arguments.JobName);
     }
 
+    [Fact]
+    public void Parse_ListenCommandWithOptions_ReturnsExpectedValues()
+    {
+        var arguments = CommandLineArguments.Parse(["listen", "--config", "custom.yaml", "--job", "personal-whatsapp-reply"]);
+
+        Assert.Equal(CliCommand.Listen, arguments.Command);
+        Assert.Equal("custom.yaml", arguments.ConfigPath);
+        Assert.Equal("personal-whatsapp-reply", arguments.JobName);
+    }
+
     [Theory]
     [InlineData("validate", CliCommand.Validate)]
     [InlineData("jobs", CliCommand.ListJobs)]
@@ -60,6 +70,14 @@ public sealed class CommandLineArgumentsTests
         var exception = Assert.Throws<ArgumentException>(() => CommandLineArguments.Parse(["run", "--unknown"]));
 
         Assert.Equal("Unknown option '--unknown'.", exception.Message);
+    }
+
+    [Fact]
+    public void Parse_ListenWithoutJob_Throws()
+    {
+        var exception = Assert.Throws<ArgumentException>(() => CommandLineArguments.Parse(["listen", "--config", "custom.yaml"]));
+
+        Assert.Equal("The listen command requires --job <name>.", exception.Message);
     }
 
     [Fact]
@@ -90,6 +108,7 @@ public sealed class CommandLineArgumentsTests
         var usage = writer.ToString();
         Assert.Contains("OneShotPrompt", usage);
         Assert.Contains("run [--config <path>] [--job <name>]", usage);
+        Assert.Contains("listen [--config <path>] --job <name>", usage);
         Assert.Contains("validate [--config <path>]", usage);
         Assert.Contains("jobs [--config <path>]", usage);
         Assert.Contains("interactive", usage);

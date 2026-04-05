@@ -306,6 +306,9 @@ FakesAssemblies/
 # Node.js Tools for Visual Studio
 .ntvs_analysis.dat
 node_modules/
+tools/whatsapp-personal-channel/channel.config.json
+tools/whatsapp-personal-channel/.wwebjs_auth/
+tools/whatsapp-personal-channel/.wwebjs_cache/
 
 # Visual Studio 6 build log
 *.plg
@@ -426,3 +429,4 @@ FodyWeavers.xsd
 .vscode/
 OneShotPrompt.code-workspace
 session-state/
+.wwebjs_cache/

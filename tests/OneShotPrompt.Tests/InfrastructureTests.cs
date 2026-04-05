@@ -9,6 +9,14 @@ namespace OneShotPrompt.Tests;
 public sealed class InfrastructureTests
 {
     [Fact]
+    public void MicrosoftExtensionsAiAbstractions_ContainsToolApprovalRequestContent()
+    {
+        var approvalType = Type.GetType("Microsoft.Extensions.AI.ToolApprovalRequestContent, Microsoft.Extensions.AI.Abstractions");
+
+        Assert.NotNull(approvalType);
+    }
+
+    [Fact]
     public void AgentFrameworkJobAgent_NormalizeResponseText_CollapsesRepeatedCopilotOutput()
     {
         var response = "Hello! How can I assist you with your project today?Hello! How can I assist you with your project today?";

@@ -1,6 +1,7 @@
 using OneShotPrompt.Application.Abstractions;
 using OneShotPrompt.Application.Services;
 using OneShotPrompt.Core.Models;
+using OneShotPrompt.Infrastructure.Channels;
 
 namespace OneShotPrompt.Tests;
 
@@ -335,6 +336,117 @@ public sealed class JobRunnerTests
 
         Assert.NotNull(loader.LastOptions);
         Assert.Equal(ProviderValidationScope.None, loader.LastOptions!.ProviderValidationScope);
+    }
+
+    [Fact]
+    public async Task ListenAsync_ReturnsOneWhenNoEnabledJobMatches()
+    {
+        var config = CreateConfig(new JobDefinition
+        {
+            Name = "disabled",
+            Prompt = "noop",
+            Provider = "OpenAI",
+            Enabled = false,
+        });
+        var runner = new JobRunner(
+            new FakeConfigLoader(config),
+            new FakeJobAgentFactory(),
+            new FakeExecutionMemoryStore());
+        var waitCalled = false;
+
+        using var writer = new StringWriter();
+        var exitCode = await runner.ListenAsync(
+            "config.yaml",
+            "missing",
+            _ =>
+            {
+                waitCalled = true;
+                return Task.FromResult(new JobTriggerSignal("whatsapp-personal-channel", "ignored"));
+            },
+            writer,
+            CancellationToken.None);
+
+        Assert.Equal(1, exitCode);
+        Assert.False(waitCalled);
+        Assert.Contains("No enabled job named 'missing' was found.", writer.ToString());
+    }
+
+    [Fact]
+    public async Task ListenAsync_RunsSelectedJobForEachTriggerUntilCancelled()
+    {
+        var config = CreateConfig(new JobDefinition
+        {
+            Name = "personal-whatsapp-reply",
+            Prompt = "reply",
+            Provider = "OpenAI",
+            Enabled = true,
+        });
+
+        var runner = new JobRunner(
+            new FakeConfigLoader(config),
+            new FakeJobAgentFactory
+            {
+                PreparedAgent = new PreparedJobAgent(new FakeJobAgent("done"), new ToolSelectionSummary())
+            },
+            new FakeExecutionMemoryStore());
+
+        using var writer = new StringWriter();
+        using var source = new CancellationTokenSource();
+        var waitCalls = 0;
+
+        async Task<JobTriggerSignal> WaitForTriggerAsync(CancellationToken cancellationToken)
+        {
+            waitCalls++;
+
+            if (waitCalls == 1)
+            {
+                return new JobTriggerSignal("whatsapp-personal-channel", "Incoming message from 15551234567: Hello there");
+            }
+
+            source.Cancel();
+            await Task.FromCanceled(cancellationToken);
+            throw new InvalidOperationException("Unreachable");
+        }
+
+        var exitCode = await runner.ListenAsync(
+            "config.yaml",
+            "personal-whatsapp-reply",
+            WaitForTriggerAsync,
+            writer,
+            source.Token);
+        var output = writer.ToString();
+
+        Assert.Equal(0, exitCode);
+        Assert.Contains("> Listening for triggers for job: personal-whatsapp-reply", output);
+        Assert.Contains("> Trigger received: whatsapp-personal-channel | Incoming message from 15551234567: Hello there", output);
+        Assert.Contains("> Running job: personal-whatsapp-reply", output);
+        Assert.Contains("done", output);
+        Assert.Contains("> Listener stopped for job: personal-whatsapp-reply (triggers handled: 1)", output);
+    }
+
+    [Fact]
+    public void WhatsAppPersonalChannelListener_ParseWaitResult_ReadsMessagePayload()
+    {
+        var result = ProcessTestHarness.InvokePrivateStatic(
+            typeof(WhatsAppPersonalChannelListener),
+            "ParseWaitResult",
+            """
+            {
+              "ok": true,
+              "timedOut": false,
+              "message": {
+                "phoneNumber": "15551234567",
+                "body": "Hello",
+                "type": "chat"
+              }
+            }
+            """)!;
+
+        var resultType = result.GetType();
+        Assert.False((bool)resultType.GetProperty("TimedOut")!.GetValue(result)!);
+        Assert.Equal("15551234567", resultType.GetProperty("PhoneNumber")!.GetValue(result));
+        Assert.Equal("Hello", resultType.GetProperty("Body")!.GetValue(result));
+        Assert.Equal("chat", resultType.GetProperty("MessageType")!.GetValue(result));
     }
 
     private static AppConfig CreateConfig(params JobDefinition[] jobs)

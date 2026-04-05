@@ -928,8 +928,8 @@ public sealed class AgentFactory(IJobEventSink? eventSink = null) : IJobAgentFac
         return skillPaths.Count switch
         {
             0 => throw new InvalidOperationException("No skill directories are available."),
-            1 => new FileAgentSkillsProvider(skillPaths[0], options: null, loggerFactory: null),
-            _ => new FileAgentSkillsProvider(skillPaths, options: null, loggerFactory: null),
+            1 => new AgentSkillsProvider(skillPaths[0], scriptRunner: null, fileOptions: null, options: null, loggerFactory: null),
+            _ => new AgentSkillsProvider(skillPaths, scriptRunner: null, fileOptions: null, options: null, loggerFactory: null),
         };
     }
 #pragma warning restore MAAI001

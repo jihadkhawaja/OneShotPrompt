@@ -73,6 +73,29 @@ If a named job is missing or disabled, the command returns a non-zero exit code.
 
 If multiple jobs are selected, execution continues through the set and returns non-zero if any selected job fails.
 
+## Listen For WhatsApp Events
+
+This mode is intended for the local WhatsApp personal channel bridge. Start the bridge first, then keep one selected job waiting for inbound allowlisted messages.
+
+```powershell
+pwsh ./scripts/start-whatsapp-personal-channel.ps1
+dotnet run --project src/OneShotPrompt.Console -- listen --config config.yaml --job personal-whatsapp-reply
+```
+
+Or use the helper script:
+
+```powershell
+./scripts/run-job.ps1 -ConfigPath ./config.yaml -JobName personal-whatsapp-reply -Listen
+```
+
+Operational details:
+
+- `listen` requires `--job`.
+- Each inbound allowlisted WhatsApp message triggers a normal single-job execution.
+- Stop the listener with `Ctrl+C`.
+- The command writes logs the same way `run` does.
+- This is for targeted local bridge scenarios, not a general internal scheduler.
+
 ## Interactive Console
 
 Start the menu explicitly:
@@ -95,6 +118,7 @@ Behavior details:
   - Run direct prompt
   - Run all jobs
   - Run specific job
+  - Listen for WhatsApp replies
   - Validate
   - List jobs
   - Clear memories
@@ -128,7 +152,7 @@ Tool-selection telemetry includes:
 
 For `corporate-planning` jobs, the telemetry also includes each generated planning participant and the subset of tools assigned to that participant.
 
-Every `run` invocation writes a timestamped log file under `logs/` next to the active config file. Interactive direct prompts write to the same location.
+Every `run` and `listen` invocation writes a timestamped log file under `logs/` next to the active config file. Interactive direct prompts write to the same location.
 
 If a job uses `Workflow: "corporate-planning"`, the log file also records streamed group-chat events and explicit output boundaries around the final rendered response.
 
@@ -205,6 +229,8 @@ For unattended runs, prefer the explicit form below over relying on default beha
 ```text
 run --config <path> --job <name>
 ```
+
+For the personal WhatsApp bridge, prefer `listen --config <path> --job <name>` over building an external tight polling loop around `run`.
 
 ## Release Packaging
 

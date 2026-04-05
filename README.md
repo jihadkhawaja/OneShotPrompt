@@ -1,8 +1,8 @@
 # OneShotPrompt
 
-OneShotPrompt is a .NET 10 console application for running one-shot AI jobs from YAML.
+OneShotPrompt is a .NET 10 console application for running one-shot AI jobs from YAML, with a targeted listener mode for local trigger sources such as the WhatsApp personal channel bridge.
 
-It is built for local automation that should stay simple, explicit, and reviewable: define jobs in a single config file, let the runtime narrow the tool set before execution, stream what the agent is doing, and keep scheduling in the operating system instead of burying it inside the app.
+It is built for local automation that should stay simple, explicit, and reviewable: define jobs in a single config file, let the runtime narrow the tool set before execution, stream what the agent is doing, and keep most scheduling in the operating system instead of burying it inside the app.
 
 ## Why OneShotPrompt
 
@@ -25,6 +25,7 @@ Most AI automation tools either hide too much behavior or ask you to build a ful
 - Write structured execution logs to a `logs/` directory next to the active config file.
 - Store per-job memory in `.oneshotprompt/memory/` when memory is enabled.
 - Support both named jobs and ad-hoc prompts from the interactive menu.
+- Keep a selected job listening for inbound allowlisted WhatsApp messages through the local bridge.
 - Publish as Native AOT by default.
 
 ## How It Works
@@ -108,6 +109,12 @@ dotnet run --project src/OneShotPrompt.Console -- run --config config.yaml
 dotnet run --project src/OneShotPrompt.Console -- run --config config.yaml --job downloads-cleanup
 ```
 
+If you configured the WhatsApp personal channel bridge, you can also keep one selected job listening for inbound events:
+
+```powershell
+dotnet run --project src/OneShotPrompt.Console -- listen --config config.yaml --job personal-whatsapp-reply
+```
+
 ### 5. Open the interactive console
 
 ```powershell
@@ -127,6 +134,7 @@ Select action:
 > Run direct prompt
   Run all jobs
   Run specific job
+  Listen for WhatsApp replies
   Validate
   List jobs
   Clear memories
@@ -184,7 +192,7 @@ Use OneShotPrompt when you want:
 
 It is a weaker fit when you need:
 
-- Long-running autonomous agents
+- General-purpose long-running autonomous agents beyond the targeted `listen` bridge modes
 - Multi-user orchestration or a hosted control plane
 - Hidden background automation without explicit operating-system scheduling
 
@@ -193,6 +201,7 @@ It is a weaker fit when you need:
 - [Configuration guide](docs/configuration.md)
 - [CLI reference](docs/cli-reference.md)
 - [Operations guide](docs/operations.md)
+- [WhatsApp personal channel](docs/whatsapp-personal-channel.md)
 - [Windows Task Scheduler walkthrough](docs/windows-task-scheduler.md)
 - [Linux scheduling walkthrough](docs/linux-scheduling.md)
 

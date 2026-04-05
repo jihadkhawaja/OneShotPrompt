@@ -12,6 +12,7 @@ public sealed class ProgramIntegrationTests
 
         Assert.Equal(0, exitCode);
         Assert.Contains("Commands:", output.ToString());
+        Assert.Contains("listen [--config <path>] --job <name>", output.ToString());
         Assert.Equal(string.Empty, error.ToString());
     }
 
@@ -27,6 +28,19 @@ public sealed class ProgramIntegrationTests
         Assert.Contains("Unknown command 'deploy'.", error.ToString());
         Assert.Contains("Commands:", error.ToString());
     }
+
+      [Fact]
+      public async Task ConsoleApplication_ListenWithoutJob_PrintsErrorAndUsage()
+      {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var exitCode = await ConsoleApplication.RunAsync(["listen", "--config", "config.yaml"], output, error);
+
+        Assert.Equal(1, exitCode);
+        Assert.Contains("The listen command requires --job <name>.", error.ToString());
+        Assert.Contains("listen [--config <path>] --job <name>", error.ToString());
+      }
 
     [Fact]
     public async Task ConsoleApplication_Validate_UsesRealComposition()
@@ -138,6 +152,7 @@ public sealed class ProgramIntegrationTests
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("Commands:", result.StandardOutput);
+        Assert.Contains("listen [--config <path>] --job <name>", result.StandardOutput);
         Assert.True(string.IsNullOrWhiteSpace(result.StandardError));
     }
 

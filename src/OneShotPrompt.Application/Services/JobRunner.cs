@@ -16,13 +16,7 @@ public sealed class JobRunner(
         var config = await configLoader.LoadAsync(
             configPath,
             cancellationToken,
-            new ConfigLoadOptions
-            {
-                ProviderValidationScope = string.IsNullOrWhiteSpace(jobName)
-                    ? ProviderValidationScope.EnabledJobs
-                    : ProviderValidationScope.SelectedJobs,
-                SelectedJobNames = string.IsNullOrWhiteSpace(jobName) ? [] : [jobName],
-            });
+            CreateRunLoadOptions(jobName));
         var jobs = SelectJobs(config, jobName);
 
         if (jobs.Count == 0)
@@ -92,6 +86,77 @@ public sealed class JobRunner(
         return hasFailures ? 1 : 0;
     }
 
+    public async Task<int> ListenAsync(
+        string configPath,
+        string jobName,
+        Func<CancellationToken, Task<JobTriggerSignal>> waitForTriggerAsync,
+        TextWriter output,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(jobName))
+        {
+            throw new ArgumentException("A job name is required for listen mode.", nameof(jobName));
+        }
+
+        ArgumentNullException.ThrowIfNull(waitForTriggerAsync);
+
+        var config = await configLoader.LoadAsync(
+            configPath,
+            cancellationToken,
+            CreateRunLoadOptions(jobName));
+        var jobs = SelectJobs(config, jobName);
+
+        if (jobs.Count == 0)
+        {
+            await output.WriteLineAsync($"No enabled job named '{jobName}' was found.");
+            return 1;
+        }
+
+        await output.WriteLineAsync($"> Listening for triggers for job: {jobName}");
+        await output.WriteLineAsync("  Source: whatsapp-personal-channel");
+        await output.WriteLineAsync("  Press Ctrl+C to stop.");
+        await output.WriteLineAsync(string.Empty);
+        eventSink?.Emit(new JobLogEvent($"Listener started: {jobName}"));
+
+        var hasFailures = false;
+        var triggerCount = 0;
+
+        try
+        {
+            while (true)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var trigger = await waitForTriggerAsync(cancellationToken);
+                triggerCount++;
+
+                eventSink?.Emit(new OutputBoundaryEvent());
+                eventSink?.Emit(new JobLogEvent($"Trigger received: {jobName} -- {trigger.Source} -- {trigger.Summary}"));
+                await output.WriteLineAsync($"> Trigger received: {trigger.Source} | {trigger.Summary}");
+
+                var exitCode = await RunAsync(configPath, jobName, output, cancellationToken);
+                if (exitCode != 0)
+                {
+                    hasFailures = true;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await output.WriteLineAsync($"> Listener stopped for job: {jobName} (triggers handled: {triggerCount})");
+            await output.WriteLineAsync(string.Empty);
+            eventSink?.Emit(new JobLogEvent($"Listener stopped: {jobName} -- triggers handled: {triggerCount}"));
+            return hasFailures ? 1 : 0;
+        }
+        catch (Exception exception)
+        {
+            eventSink?.Emit(new OutputBoundaryEvent());
+            await output.WriteLineAsync($"Listener for job '{jobName}' failed: {exception.Message}");
+            await output.WriteLineAsync(string.Empty);
+            eventSink?.Emit(new JobLogEvent($"Listener failed: {jobName} -- {exception.Message}"));
+            return 1;
+        }
+    }
+
     public async Task<int> RunAdHocAsync(AppConfig config, JobDefinition job, string configDirectory, TextWriter output, CancellationToken cancellationToken)
     {
         await output.WriteLineAsync($"> Running ad-hoc prompt ({job.Provider})");
@@ -151,6 +216,17 @@ public sealed class JobRunner(
         }
 
         return 0;
+    }
+
+    private static ConfigLoadOptions CreateRunLoadOptions(string? jobName)
+    {
+        return new ConfigLoadOptions
+        {
+            ProviderValidationScope = string.IsNullOrWhiteSpace(jobName)
+                ? ProviderValidationScope.EnabledJobs
+                : ProviderValidationScope.SelectedJobs,
+            SelectedJobNames = string.IsNullOrWhiteSpace(jobName) ? [] : [jobName],
+        };
     }
 
     private static List<JobDefinition> SelectJobs(AppConfig config, string? jobName)

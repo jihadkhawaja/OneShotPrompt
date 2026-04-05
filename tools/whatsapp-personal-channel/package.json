@@ -1,0 +1,19 @@
+{
+  "name": "whatsapp-personal-channel",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "node --disable-warning=DEP0040 channel.mjs serve",
+    "doctor": "node --disable-warning=DEP0040 channel.mjs doctor",
+    "health": "node --disable-warning=DEP0040 channel.mjs health",
+    "list-unread": "node --disable-warning=DEP0040 channel.mjs list-unread",
+    "list-recent": "node --disable-warning=DEP0040 channel.mjs list-recent",
+    "wait-next-message": "node --disable-warning=DEP0040 channel.mjs wait-next-message",
+    "send": "node --disable-warning=DEP0040 channel.mjs send"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.34.6"
+  }
+}

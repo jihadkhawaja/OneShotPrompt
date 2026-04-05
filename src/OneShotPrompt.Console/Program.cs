@@ -5,6 +5,7 @@ using OneShotPrompt.Console.Cli;
 using OneShotPrompt.Console.Rendering;
 using OneShotPrompt.Core.Models;
 using OneShotPrompt.Infrastructure.Configuration;
+using OneShotPrompt.Infrastructure.Channels;
 using OneShotPrompt.Infrastructure.Logging;
 using OneShotPrompt.Infrastructure.Persistence;
 using OneShotPrompt.Infrastructure.Providers;
@@ -123,7 +124,7 @@ internal static class ConsoleApplication
             var configDirectory = Path.GetDirectoryName(Path.GetFullPath(arguments.ConfigPath)) ?? Environment.CurrentDirectory;
             CompositeJobEventSink? compositeEventSink = null;
 
-            if (arguments.Command is CliCommand.Run)
+            if (arguments.Command is CliCommand.Run or CliCommand.Listen)
             {
                 var sinks = new List<IJobEventSink>
                 {
@@ -149,6 +150,12 @@ internal static class ConsoleApplication
                 return arguments.Command switch
                 {
                     CliCommand.Run => await jobRunner.RunAsync(arguments.ConfigPath, arguments.JobName, output, cancellationSource.Token),
+                    CliCommand.Listen => await jobRunner.ListenAsync(
+                        arguments.ConfigPath,
+                        arguments.JobName!,
+                        new WhatsAppPersonalChannelListener(configDirectory).WaitForNextMessageAsync,
+                        output,
+                        cancellationSource.Token),
                     CliCommand.Validate => await jobRunner.ValidateAsync(arguments.ConfigPath, output, cancellationSource.Token),
                     CliCommand.ListJobs => await jobRunner.ListJobsAsync(arguments.ConfigPath, output, cancellationSource.Token),
                     _ => 1,

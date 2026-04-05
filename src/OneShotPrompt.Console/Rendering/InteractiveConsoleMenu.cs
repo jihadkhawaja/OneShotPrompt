@@ -34,7 +34,7 @@ internal static class InteractiveConsoleMenu
                 new SelectionPrompt<string>()
                     .Title("[blue]Select action:[/]")
                     .HighlightStyle("yellow")
-                    .AddChoices("Run direct prompt", "Run all jobs", "Run specific job", "Validate", "List jobs", "Clear memories", "Exit"));
+                    .AddChoices("Run direct prompt", "Run all jobs", "Run specific job", "Listen for WhatsApp replies", "Validate", "List jobs", "Clear memories", "Exit"));
 
             if (command == "Exit")
             {
@@ -47,6 +47,7 @@ internal static class InteractiveConsoleMenu
                 "Run all jobs" => await ConsoleApplication.RunAsync(
                     ["run", "--config", configPath], System.Console.Out, System.Console.Error),
                 "Run specific job" => await SelectAndRunJobAsync(configPath),
+                "Listen for WhatsApp replies" => await SelectAndListenJobAsync(configPath),
                 "Validate" => await ConsoleApplication.RunAsync(
                     ["validate", "--config", configPath], System.Console.Out, System.Console.Error),
                 "List jobs" => await ConsoleApplication.RunAsync(
@@ -138,6 +139,30 @@ internal static class InteractiveConsoleMenu
 
     private static async Task<int> SelectAndRunJobAsync(string configPath)
     {
+        var selectedJob = await SelectEnabledJobAsync(configPath, "[blue]Select job:[/]");
+        if (selectedJob is null)
+        {
+            return 1;
+        }
+
+        return await ConsoleApplication.RunAsync(
+            ["run", "--config", configPath, "--job", selectedJob], System.Console.Out, System.Console.Error);
+    }
+
+    private static async Task<int> SelectAndListenJobAsync(string configPath)
+    {
+        var selectedJob = await SelectEnabledJobAsync(configPath, "[blue]Select job to listen for:[/]");
+        if (selectedJob is null)
+        {
+            return 1;
+        }
+
+        return await ConsoleApplication.RunAsync(
+            ["listen", "--config", configPath, "--job", selectedJob], System.Console.Out, System.Console.Error);
+    }
+
+    private static async Task<string?> SelectEnabledJobAsync(string configPath, string title)
+    {
         var loader = new YamlConfigLoader();
         var config = await loader.LoadAsync(
             configPath,
@@ -155,16 +180,13 @@ internal static class InteractiveConsoleMenu
         if (enabledJobs.Count == 0)
         {
             AnsiConsole.MarkupLine("[red]No enabled jobs found.[/]");
-            return 1;
+            return null;
         }
 
-        var selectedJob = AnsiConsole.Prompt(
+        return AnsiConsole.Prompt(
             new SelectionPrompt<string>()
-                .Title("[blue]Select job:[/]")
+                .Title(title)
                 .HighlightStyle("yellow")
                 .AddChoices(enabledJobs));
-
-        return await ConsoleApplication.RunAsync(
-            ["run", "--config", configPath, "--job", selectedJob], System.Console.Out, System.Console.Error);
     }
 }

@@ -11,6 +11,7 @@ OneShotPrompt
 
 Commands:
   run [--config <path>] [--job <name>]
+  listen [--config <path>] --job <name>
   validate [--config <path>]
   jobs [--config <path>]
   interactive
@@ -116,6 +117,30 @@ Tool-selection telemetry can include:
 
 In interactive terminals, `corporate-planning` jobs can also stream live group-chat messages from the generated planning participants before the final response is printed.
 
+### `listen`
+
+Waits for inbound events from the local WhatsApp personal channel bridge and re-runs one named enabled job each time a new allowlisted message arrives.
+
+```powershell
+dotnet run --project src/OneShotPrompt.Console -- listen --config config.yaml --job personal-whatsapp-reply
+```
+
+Behavior details:
+
+- `--job` is required.
+- The command is intended for jobs such as `personal-whatsapp-reply` that use the local `whatsapp-personal-channel` skill.
+- The WhatsApp bridge must already be running in a separate terminal.
+- Each inbound allowlisted message triggers a normal single-job execution.
+- The listener continues until you press `Ctrl+C`.
+- If any triggered job run fails, the listener returns non-zero when it stops.
+
+During execution, the command prints:
+
+- `> Listening for triggers for job: <name>`
+- `> Trigger received: whatsapp-personal-channel | <summary>`
+- The same job execution output produced by `run --job <name>`
+- `> Listener stopped for job: <name> (triggers handled: <count>)` when you stop it
+
 ### `interactive` and `-i`
 
 Opens the Spectre.Console menu.
@@ -130,6 +155,7 @@ Menu actions:
 - Run direct prompt
 - Run all jobs
 - Run specific job
+- Listen for WhatsApp replies
 - Validate
 - List jobs
 - Clear memories
@@ -144,6 +170,7 @@ Menu actions:
 Supported by:
 
 - `run`
+- `listen`
 - `validate`
 - `jobs`
 
@@ -160,8 +187,11 @@ The config file path also determines where sibling runtime content is resolved:
 Supported by:
 
 - `run`
+- `listen`
 
-When omitted, all enabled jobs run. When provided, only the matching enabled job runs.
+When omitted for `run`, all enabled jobs run. When provided, only the matching enabled job runs.
+
+For `listen`, `--job` is required.
 
 When `--job` is provided, provider-setting validation is scoped to that selected job. Without `--job`, provider-setting validation is scoped to enabled jobs.
 
@@ -182,6 +212,7 @@ High-level exit behavior:
 - `validate`: `0` on success, non-zero on invalid config or missing file
 - `jobs`: `0` on success, non-zero on config load failure
 - `run`: `0` only when every selected job succeeds
+- `listen`: `0` when stopped cleanly and every triggered job succeeded, non-zero otherwise
 - `interactive`: returns the last action's exit code
 
 ## Helper Scripts
@@ -205,6 +236,7 @@ The repository includes PowerShell wrappers around the main CLI:
 ```powershell
 ./scripts/run-job.ps1 -ConfigPath ./config.yaml
 ./scripts/run-job.ps1 -ConfigPath ./config.yaml -JobName downloads-cleanup
+./scripts/run-job.ps1 -ConfigPath ./config.yaml -JobName personal-whatsapp-reply -Listen
 ```
 
 ### Publish AOT

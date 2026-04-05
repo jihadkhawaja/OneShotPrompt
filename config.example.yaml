@@ -87,3 +87,11 @@ Jobs:
     PersistMemory: false
     ThinkingLevel: "medium"
     Enabled: false
+
+  - Name: "personal-whatsapp-reply"
+    Prompt: 'Use the whatsapp-personal-channel skill. Check bridge health first with "node tools/whatsapp-personal-channel/channel.mjs health". Then inspect unread inbound messages with "node tools/whatsapp-personal-channel/channel.mjs list-unread --limit 10". If there are no unread messages, say so and do not send anything. If a reply is clearly warranted, send exactly one concise reply with "node tools/whatsapp-personal-channel/channel.mjs send --text \"...\"". Never contact any number outside the bridge allowlist.'
+    Provider: "OpenAI"
+    Workflow: "single-agent"
+    AutoApprove: true
+    AllowedTools: "RunCommand"
+    Enabled: true

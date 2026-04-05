@@ -28,6 +28,7 @@ public sealed class CommandLineArguments
         var command = args[0] switch
         {
             "run" => CliCommand.Run,
+            "listen" => CliCommand.Listen,
             "validate" => CliCommand.Validate,
             "jobs" => CliCommand.ListJobs,
             _ => throw new ArgumentException($"Unknown command '{args[0]}'.")
@@ -51,6 +52,11 @@ public sealed class CommandLineArguments
             }
         }
 
+        if (command is CliCommand.Listen && string.IsNullOrWhiteSpace(jobName))
+        {
+            throw new ArgumentException("The listen command requires --job <name>.");
+        }
+
         return new CommandLineArguments
         {
             Command = command,
@@ -65,6 +71,7 @@ public sealed class CommandLineArguments
         writer.WriteLine();
         writer.WriteLine("Commands:");
         writer.WriteLine("  run [--config <path>] [--job <name>]");
+        writer.WriteLine("  listen [--config <path>] --job <name>");
         writer.WriteLine("  validate [--config <path>]");
         writer.WriteLine("  jobs [--config <path>]");
         writer.WriteLine("  interactive");
@@ -87,6 +94,7 @@ public enum CliCommand
 {
     Help,
     Run,
+    Listen,
     Validate,
     ListJobs,
     Interactive,
